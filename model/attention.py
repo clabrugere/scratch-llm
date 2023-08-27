@@ -14,7 +14,7 @@ class FeedForward(nn.Module):
         super().__init__()
 
         # the activation function GLU (for gated linear unit) is defined as GLU(a,b)=a⊗σ(b)
-        # where a is the first half of the input matrices and bb is the second half.
+        # where a is the first half of the input matrices and b is the second half.
         self._layers = nn.Sequential()
         for _ in range(num_hidden):
             self._layers.append(nn.Linear(dim_in, dim_hidden, device=device))
@@ -49,7 +49,7 @@ class SelfAttention(nn.Module):
         keys = self.K(x)  # (bs, seq_len, dim_q)
         values = self.V(x)  # (bs, seq_len, dim_v)
 
-        # compute the correlation between a query q_i and all the keys, for very q_i
+        # compute the correlation between a query q_i and all the keys, for every q_i
         attn_scores = queries @ torch.transpose(keys, 2, 1)  # (bs, seq_len, seq_len)
 
         # fill the upper triangular part of the attention scores with -inf to inhibit them in the softmax
