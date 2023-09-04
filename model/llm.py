@@ -1,7 +1,7 @@
 import torch
+import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Module, Sequential, Embedding, Linear, Dropout
-import torch.nn.functional as F
 
 from model.transformer import TransformerBlock
 
@@ -21,6 +21,7 @@ class LLM(Module):
     ) -> None:
         super().__init__()
 
+        self.seq_len = seq_len
         self.token_embedding = Embedding(vocab_size, dim_emb)
         self.emb_dropout = Dropout(emb_dropout)
         self.transformer = Sequential(
@@ -37,8 +38,22 @@ class LLM(Module):
         x = self.transformer(x)  # (bs, seq_len, dim_emb)
         x = self.projection_head(x)  # (bs, seq_len, vocab_size)
 
-        return x
+        return x  # (bs, seq_len, vocab_size)
 
     @torch.inference_mode()
-    def generate(self, inputs: Tensor, max_seq_len: int) -> Tensor:
-        pass
+    def generate(self, inputs, max_seq_len, temperature=1.0):
+        for _ in range(max_seq_len):
+            # make sure the sequence we're generating doesn't exceed model's sequence length
+            inputs_cond = inputs if inputs.size(1) <= self.seq_len else inputs[:, -self.seq_len :]
+
+            # get logits from model (only the last token in the sequence) and rescale them to get a probability distribution over the vocabulary
+            logits = self(inputs_cond)[:, -1, :]  # (bs, 1, vocab_size)
+            probs = F.softmax(logits / temperature, dim=-1)
+
+            # sample the next token
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            # append to the sequence being generated
+            inputs = torch.cat((inputs, next_token), dim=-1)
+
+        return inputs

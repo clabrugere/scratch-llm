@@ -33,8 +33,8 @@ class RMSNorm(Module):
 
         self.dim_last = dim_last
         self.eps = eps
-        self.gain = Parameter(torch.ones(self.dim_last))
-        self.bias = Parameter(torch.zeros(self.dim_last))
+        self.gain = Parameter(torch.ones(self.dim_last), requires_grad=True)
+        self.bias = Parameter(torch.zeros(self.dim_last), requires_grad=True)
 
     def forward(self, x: Tensor) -> Tensor:
         # x is of shape (..., dim_last)
@@ -200,9 +200,9 @@ class TransformerBlock(Module):
         super().__init__()
 
         # Follows LLama 2 architecture:
+        # - positional encoding at every block start
         # - RMS pre-normalization instead of layer normalization
         # - SwiGLU activation for the feedforward
-        # - positional encoding at every block start
         self.pos_encoding = CosinePositionalEncoding(seq_len, dim_emb)
         self.norm_1 = RMSNorm(dim_emb)
         self.multihead_attn = MultiHeadAttention(seq_len, attn_num_heads, dim_emb, causal=attn_causal)
@@ -211,9 +211,7 @@ class TransformerBlock(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.pos_encoding(x)  # (bs, seq_len, dim_in)
-        x = self.norm_1(x)  # (bs, seq_len, dim_in)
-        x = self.multihead_attn(x) + x  # (bs, seq_len, dim_in)
-        x = self.norm_2(x)  # (bs, seq_len, dim_in)
-        x = self.feed_forward(x) + x  # (bs, seq_len, dim_in)
+        x = x + self.multihead_attn(self.norm_1(x))  # (bs, seq_len, dim_in)
+        x = x + self.feed_forward(self.norm_2(x))  # (bs, seq_len, dim_in)
 
         return x  # (bs, seq_len, dim_in)
