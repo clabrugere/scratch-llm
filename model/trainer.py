@@ -53,7 +53,7 @@ def train(
 
         metrics_tracker["loss"].append(loss.detach().cpu().item())
 
-        if step % log_every == 0:
+        if step % log_every == 0 or step == max_steps - 1:
             log(step, max_steps, metrics_tracker)
 
         # val_loss = evaluate(model, dl_val, device)
