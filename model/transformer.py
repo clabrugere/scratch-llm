@@ -27,28 +27,27 @@ class CosinePositionalEncoding(Module):
 
 
 class RMSNorm(Module):
-    # RMSnorm(x_i) = (x_i / RMS(x)) * g_i + b_i where RMS(x) = sqrt(1 / n *  sum a_i ** 2)
+    # RMSnorm(x_i) = (x_i / RMS(x)) * g_i where RMS(x) = sqrt(1 / n *  sum a_i ** 2)
     def __init__(self, dim_last: int, eps: float = EPS):
         super().__init__()
 
         self.dim_last = dim_last
         self.eps = eps
         self.gain = Parameter(torch.ones(self.dim_last), requires_grad=True)
-        self.bias = Parameter(torch.zeros(self.dim_last), requires_grad=True)
 
     def forward(self, x: Tensor) -> Tensor:
         # x is of shape (..., dim_last)
         scale = torch.norm(x, dim=-1, keepdim=True) * (self.dim_last**-0.5)
-        return (x / (scale + self.eps)) * self.gain + self.bias
+        return (x / (scale + self.eps)) * self.gain
 
 
 class SwiGLU(Module):
-    def __init__(self, dim_in: int) -> None:
+    def __init__(self, dim_in: int, bias: bool = True) -> None:
         # SwiGLU computes the output as SwiGLU(x) = (xW + b) ⊗ swish(xZ + c) where W, Z, b, c are learnable params
         super().__init__()
 
         self.dim_in = dim_in
-        self.linear = Linear(dim_in, 2 * dim_in)
+        self.linear = Linear(dim_in, 2 * dim_in, bias=bias)
 
     def forward(self, x: Tensor) -> Tensor:
         # uses only one weight matrix instead of two
@@ -152,7 +151,7 @@ class MultiHeadAttention(Module):
         # attention scores are used to build a weighted linear combination of values vectors
         attn_scores = torch.softmax(attn_scores * self.dim_k**-0.5, dim=-1)  # (bs, num_heads, seq_len, seq_len)
         out = attn_scores @ values  # (bs, num_heads, seq_len, dim_v)
-        out = out.permute(0, 2, 1, 3).reshape(-1, self.seq_len, self.dim_k)  # (bs, seq_len, dim_v)
+        out = out.permute(0, 2, 1, 3).contiguous().view(-1, self.seq_len, self.dim_k)  # (bs, seq_len, dim_v)
 
         # projects to the output space
         out = self.projection_out(out)  # (bs, seq_len, dim_v)
@@ -168,20 +167,22 @@ class FeedForward(Module):
         self,
         dim_in: int,
         dim_hidden: int,
-        num_hidden: int,
+        num_hidden: int = 1,
+        bias: bool = True,
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
 
         self._layers = Sequential()
         for _ in range(num_hidden - 1):
-            self._layers.append(Linear(dim_in, dim_hidden))
+            self._layers.append(Linear(dim_in, dim_hidden, bias=bias))
             self._layers.append(RMSNorm(dim_hidden))
             self._layers.append(SwiGLU(dim_hidden))
-            self._layers.append(Dropout(dropout))
+            if dropout > 0.0:
+                self._layers.append(Dropout(dropout))
             dim_in = dim_hidden
 
-        self._layers.append(Linear(dim_in, dim_hidden))
+        self._layers.append(Linear(dim_in, dim_hidden, bias=bias))
 
     def forward(self, x: Tensor) -> Tensor:
         return self._layers(x)

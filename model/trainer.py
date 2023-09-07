@@ -3,7 +3,7 @@ from collections import defaultdict
 import logging
 
 import torch
-from torch import Module
+from torch.nn import Module
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from torch.optim import Adam
@@ -16,50 +16,48 @@ logging.basicConfig(
 )
 
 
-def log(epoch, step, batch_size, metrics, mode="train"):
-    metrics_print = " - ".join([f"{m}: {v:.3f}" for m, v in metrics.items()])
+def log(step, max_steps, metrics, mode="train"):
+    metrics_print = " - ".join([f"{m}: {v[-1]:.3f}" for m, v in metrics.items()])
 
     if mode == "train":
-        print(f"Epoch {epoch + 1:02d} - batch {step + 1}/{batch_size} -", metrics_print, end="\r")
+        print(f"Step {step + 1}/{max_steps} -", metrics_print, end="\r")
     if mode == "eval":
-        print(f"\n\tEpoch {epoch + 1:02d} -", metrics_print)
+        print(f"\n\Step {step + 1}/{max_steps} -", metrics_print)
 
 
 def train(
     model: Module,
-    dl_train: DataLoader,
-    dl_val: DataLoader,
+    ds_train,
+    batch_size: int,
     lr: float,
-    max_epoch: int,
+    max_steps: int,
     device: str = DEVICE,
     log_every: int = 10,
 ) -> Tuple[Module, defaultdict]:
     metrics_tracker = defaultdict(list)
-    val_loss_tracker = defaultdict(list)
-    batch_size = dl_train.batch_size
+    # val_loss_tracker = defaultdict(list)
 
     model.to(device)
     optimizer = Adam(model.parameters(), lr=lr)
     model.train()
 
-    for epoch in range(max_epoch):
-        for i, (x, labels) in enumerate(iter(dl_train)):
-            x, labels = x.to(device), labels.to(device)
-            logits = model(x)
+    for step in range(max_steps):
+        inputs, labels = ds_train.get_batch(batch_size)
+        inputs, labels = inputs.to(device), labels.to(device)
+        logits = model(inputs)
 
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), labels.view(-1), ignore_index=-1)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad(set_to_none=True)
+        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), labels.view(-1), ignore_index=-1)
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
 
-            metrics_tracker["loss"].append(loss.detach().cpu().item())
-            if i % log_every == 0:
-                log(epoch, i, batch_size, metrics_tracker)
+        metrics_tracker["loss"].append(loss.detach().cpu().item())
 
-        val_loss = evaluate(model, dl_val, device)
-        val_loss_tracker["val_loss"].append(val_loss)
+        if step % log_every == 0:
+            log(step, max_steps, metrics_tracker)
 
-        log(epoch, i, batch_size, val_loss_tracker)
+        # val_loss = evaluate(model, dl_val, device)
+        # val_loss_tracker["val_loss"].append(val_loss)
 
     return model, metrics_tracker
 
