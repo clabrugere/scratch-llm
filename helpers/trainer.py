@@ -1,6 +1,4 @@
-from typing import Tuple
 from collections import defaultdict
-import logging
 
 import torch
 from torch.nn import Module
@@ -10,10 +8,6 @@ from torch.optim import Adam
 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%d-%m-%y %H:%M:%S"
-)
 
 
 def log(step, max_steps, metrics, mode="train"):
@@ -33,7 +27,7 @@ def train(
     max_steps: int,
     device: str = DEVICE,
     log_every: int = 10,
-) -> Tuple[Module, defaultdict]:
+) -> defaultdict:
     metrics_tracker = defaultdict(list)
     # val_loss_tracker = defaultdict(list)
 
@@ -51,7 +45,7 @@ def train(
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
 
-        metrics_tracker["loss"].append(loss.detach().cpu().item())
+        metrics_tracker["train_loss"].append(loss.detach().cpu().item())
 
         if step % log_every == 0 or step == max_steps - 1:
             log(step, max_steps, metrics_tracker)
@@ -59,7 +53,7 @@ def train(
         # val_loss = evaluate(model, dl_val, device)
         # val_loss_tracker["val_loss"].append(val_loss)
 
-    return model, metrics_tracker
+    return metrics_tracker
 
 
 @torch.inference_mode()

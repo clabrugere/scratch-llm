@@ -51,5 +51,5 @@ class Tokenizer:
 
 def train_tokenizer(input_file: str, vocab_size: int, output_path: str) -> None:
     prefix = os.path.splitext(output_path)[0]
-    args = f"--input={input_file} --vocab_size={vocab_size} --model_prefix={prefix} --unk_id=0 --bos_id=1 --eos_id=2 --pad_id=3"
+    args = f"--input={input_file} --vocab_size={vocab_size} --model_prefix={prefix} --pad_id=0 --unk_id=1 --bos_id=2 --eos_id=3"
     SentencePieceTrainer.Train(args)

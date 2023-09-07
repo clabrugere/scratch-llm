@@ -14,7 +14,6 @@ class LLM(Module):
         dim_emb: int,
         num_layers: int,
         attn_num_heads: int,
-        attn_causal: bool = True,
         emb_dropout: float = 0.0,
         ffd_dropout: float = 0.0,
     ) -> None:
@@ -25,7 +24,7 @@ class LLM(Module):
         self.emb_dropout = Dropout(emb_dropout)
         self.transformer = Sequential(
             *[
-                TransformerBlock(context_size, dim_emb, attn_num_heads, attn_causal, ffd_dropout=ffd_dropout)
+                TransformerBlock(context_size, dim_emb, attn_num_heads, attn_causal=True, ffd_dropout=ffd_dropout)
                 for _ in range(num_layers)
             ]
         )
