@@ -48,11 +48,6 @@ class LLM(Module):
             logits = self(inputs_cond)[:, -1, :]  # (bs, vocab_size)
 
             # TODO: Top-k sampling: set the logits of the vocab_size - k tokens to -inf
-            if top_k:
-                # return logits
-                # _, bottom_indices = torch.topk(-logits, logits.size(-1) - top_k)
-                # logits[bottom_indices] = -torch.finfo(logits.dtype).max
-                pass
 
             probs = F.softmax(logits / temperature, dim=-1)  # (bs, vocab_size)
 

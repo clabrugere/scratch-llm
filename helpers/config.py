@@ -4,10 +4,10 @@ from dataclasses import dataclass
 @dataclass
 class LLMConfig:
     vocab_size: int = 1024
-    context_size: int = 64
+    context_size: int = 256
     dim_emb: int = 512
     num_layers: int = 4
-    num_heads: int = 16
+    num_heads: int = 4
 
 
 @dataclass

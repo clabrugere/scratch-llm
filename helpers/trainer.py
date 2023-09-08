@@ -5,7 +5,7 @@ from torch.nn import Module
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from torch.optim import Adam
-
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -32,18 +32,22 @@ def train(
     # val_loss_tracker = defaultdict(list)
 
     model.to(device)
-    optimizer = Adam(model.parameters(), lr=lr)
+    optimizer = Adam(model.parameters(), lr=10 * lr)
+    scheduler = CosineAnnealingLR(optimizer, T_max=max_steps, eta_min=lr, verbose=False)
     model.train()
 
     for step in range(max_steps):
+        optimizer.zero_grad(set_to_none=True)
+
         inputs, labels = ds_train.get_batch(batch_size)
         inputs, labels = inputs.to(device), labels.to(device)
         logits = model(inputs)
 
         loss = F.cross_entropy(logits.view(-1, logits.size(-1)), labels.view(-1), ignore_index=-1)
         loss.backward()
+
         optimizer.step()
-        optimizer.zero_grad(set_to_none=True)
+        scheduler.step()
 
         metrics_tracker["train_loss"].append(loss.detach().cpu().item())
 

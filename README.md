@@ -1,8 +1,8 @@
 # Llama from scratch
 
-This repository contains a rather simple implementation of Meta's famous Llama large language model using Pytorch. The implementation is pretty straightforward, with limited dependencies. It exists for educational purposes as it doesn't care about training and inference optimization. Specifically, it doesn't use flash-attention CUDA kernels (because the goal of this implementation is to understand how LLM works with the finer granularity) nor does it make use of distributed data parallelism or fully sharded data parallel (I don't have access of clusters of GPUs anyway).
+This repository contains a rather simple implementation of Meta's famous Llama large language model using Pytorch. The implementation is pretty straightforward, with limited dependencies. It exists for educational purposes as it doesn't care about training and inference optimization. Specifically, it doesn't use flash-attention CUDA kernels (because the goal of this implementation is to understand how LLM works in details) nor does it make use of distributed data parallelism (I don't have access of clusters of GPUs anyway).
 
-This implementation includes some of the improvements over LLama, from Llama 2:
+This implementation includes some of the improvements from Llama 2:
 
 - positional encoding before every transformer block,
 - RMS pre-normalization in transformer blocks (so before multi-head attention and feedforward),

@@ -39,7 +39,7 @@ class Tokenizer:
         out = self.sp.EncodeAsIds(input, add_bos=beg_of_string, add_eos=end_of_string)
 
         if pad_seq and len(out) < seq_len:
-            out = [*out, *[self.pad_id] * (seq_len - len(out))]
+            out = [*[self.pad_id] * (seq_len - len(out)), *out]
 
         return IntTensor(out)
 
