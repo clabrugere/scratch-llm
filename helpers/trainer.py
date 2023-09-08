@@ -10,11 +10,11 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-def log(step, max_steps, metrics, mode="train"):
+def log(step, max_steps, lr, metrics, mode="train"):
     metrics_print = " - ".join([f"{m}: {v[-1]:.3f}" for m, v in metrics.items()])
 
     if mode == "train":
-        print(f"Step {step + 1}/{max_steps} -", metrics_print, end="\r")
+        print(f"Step {step + 1}/{max_steps} - LR:{lr:.4f} -", metrics_print, end="\r")
     if mode == "eval":
         print(f"\n\Step {step + 1}/{max_steps} -", metrics_print)
 
@@ -25,6 +25,7 @@ def train(
     batch_size: int,
     lr: float,
     max_steps: int,
+    weight_decay: float = 1e-2,
     device: str = DEVICE,
     log_every: int = 10,
 ) -> defaultdict:
@@ -32,7 +33,7 @@ def train(
     # val_loss_tracker = defaultdict(list)
 
     model.to(device)
-    optimizer = Adam(model.parameters(), lr=10 * lr)
+    optimizer = Adam(model.parameters(), lr=10 * lr, weight_decay=weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=max_steps, eta_min=lr, verbose=False)
     model.train()
 
@@ -50,9 +51,8 @@ def train(
         scheduler.step()
 
         metrics_tracker["train_loss"].append(loss.detach().cpu().item())
-
         if step % log_every == 0 or step == max_steps - 1:
-            log(step, max_steps, metrics_tracker)
+            log(step, max_steps, scheduler.get_last_lr()[-1], metrics_tracker)
 
         # val_loss = evaluate(model, dl_val, device)
         # val_loss_tracker["val_loss"].append(val_loss)

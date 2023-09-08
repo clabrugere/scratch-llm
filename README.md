@@ -8,7 +8,7 @@ This implementation includes some of the improvements from Llama 2:
 - RMS pre-normalization in transformer blocks (so before multi-head attention and feedforward),
 - SwiGLU activation function
 
-To make the implementation end-to-end, we train the model on a small dataset, using sentecepiece tokenizer.
+To make the implementation end-to-end, we train the model on a small dataset, using SentencePiece tokenizer.
 
 ## Getting Started <a name = "getting_started"></a>
 
@@ -32,13 +32,56 @@ Add notes about how to use the system.
 
 Let's go over some of the implementation details behind Llama large language model.
 
-### Transformer
+### Transformer and attention mechanism
 
-### Self attention and multi-head attention
+The power of this model lies on chaining transformer blocks. A transformer block is composed of a succession of a positional encoding layer, a multi-head self-attention layer and a feed-forward network.
+
+```
+TransformerBlock(
+  (pos_encoding): CosinePositionalEncoding()
+  (norm_1): RMSNorm()
+  (multihead_attn): MultiHeadAttention(
+    (projection_query): Linear(in_features=128, out_features=128, bias=False)
+    (projection_key): Linear(in_features=128, out_features=128, bias=False)
+    (projection_value): Linear(in_features=128, out_features=128, bias=False)
+    (projection_out): Linear(in_features=128, out_features=128, bias=False)
+  )
+  (norm_2): RMSNorm()
+  (feed_forward): FeedForward(
+    (_layers): Sequential(
+      (0): Linear(in_features=128, out_features=128, bias=False)
+      (1): SwiGLU(
+        (linear): Linear(in_features=128, out_features=256, bias=False)
+      )
+      (2): Linear(in_features=128, out_features=128, bias=False)
+    )
+  )
+)
+```
+
+Chaining such blocks allow to learn more and more abstract representations of the input, but always with this weighted linear decomposition mechanism using the entire context, and that is probably the reason why it works so well in practice.
+
+#### Positional encoding
+
+The positional encoding layer allows to make the subsequent layers "aware" of the relative or absolute position of each element in the input sequence. It is critical for modeling inputs where order is important (such as sentences) because the raw Self-attention block is position-invariant.
+
+<p align="center"><img src="resources/cosine_positional_encoding.png?raw=true"/></p>
+
+#### Multi-head self-attention
+
+The multi-head self attention block basically builds, for a given element of the sequence, a linear combination of all the elements of the input projected into a "value" space, weighted by a similarity score between the projections in the "query" space and "key" space. In essence, it decomposes each elements of the input sequence into a linear combination of all the elements (including itself) where the weights are similarities that are learned. In the classic dot-product attention, the similarity is the ... dot-product.
+
+For NLP, this mechanism allows to encode the importance of the others tokens in the context, for a given token. Because Llama is a decoder-only architecture, we impose the constraint that a given token can only be decomposed into a weighted sum of all the previous tokens and itself but not the tokens coming afterward (it is the concept of causal masking). A clear advantage over previous approaches is that the whole context is accessible for a given token. The multi-head part is a way to learn different weights at the same time and thus provide different representations of the input sequence, allowing the model to be more expressive.
+
+<p align="center"><img src="resources/multi-head-attention-init.png?raw=true"/></p>
+
+#### Feed-forward
+
+It is a simple MLP chaining of a linear map, a non-linear activation function and another linear map. As the output of the multi-head self-attention layer is a 3D tensor of shape (batch size, sequence length, token embedding dimensions), it is applied only on the last dimension.
 
 ### SwiGLU activation function
 
-In the transformer achitecture, the output of the attention layer pass through a simple multi layer perceptron: two linear layers with an activation function in between. The most used activation function, ReLu - that simply zeroes negative values of its input - has been widely used but some variants have been proposed to improve model stability and convergence.
+In the transformer architecture, the output of the attention layer pass through a simple multi layer perceptron: two linear layers with an activation function in between. The most used activation function, ReLu - that simply zeroes negative values of its input - has been widely used but some variants have been proposed to improve model stability and convergence.
 
 In [Llama 2: Open Foundation and Fine-Tuned Chat Models](https://arxiv.org/abs/2307.09288), authors mention that they used the SwiGLU variant to train their large language model defined as $` \text{SwiGLU}(\textbf{x}) = \text{Swish}(\textbf{x}W + b) \otimes (\textbf{x}V + c)  `$.
 
@@ -48,7 +91,7 @@ In this implementation, we stick to the regular SwiGLU for simplicity.
 
 ### RMSNorm layer
 
-A custom in the field of NLP was to use layer normalization to help improve training stability by centering and scaling the its input's distribution and provide some rubustness againt noise because it is invariant to inputs offset and rescaling. Nevertheless it introduces a computational overhead for large and deep networks through the need to calculate input's mean and standard deviation.
+A custom in the field of NLP was to use layer normalization to help improve training stability by centering and scaling the its input's distribution and provide some robustness against noise because it is invariant to inputs offset and rescaling. Nevertheless it introduces a computational overhead for large and deep networks through the need to calculate input's mean and standard deviation.
 
 Authors of [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467) argue that the real advantage of layer normalization lies in the rescaling invariance rather than the offset invariance and propose to simply rescale the inputs using the root mean square statistic $`\text{RMS}(\textbf{x}) = \sqrt{ \frac{1}{n} \sum x_i }`$, applied before the activation function: $`\text{RMSNormLayer}(\textbf{x}) = \frac{\textbf{x}}{\text{RMS}(\textbf{x})} \textbf{g}`$ where $`\textbf{g}`$ is a learned parameter.
 
@@ -59,3 +102,4 @@ Authors of [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.074
 - [Attention Is All You Need](https://arxiv.org/abs/1706.03762)
 - [GLU Variants Improve Transformer](https://arxiv.org/abs/2002.05202)
 - [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467)
+- [SentencePiece](https://github.com/google/sentencepiece)

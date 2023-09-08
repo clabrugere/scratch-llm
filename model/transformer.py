@@ -167,8 +167,9 @@ class FeedForward(Module):
         self,
         dim_in: int,
         dim_hidden: int,
-        num_hidden: int = 1,
-        bias: bool = True,
+        num_hidden,
+        bias: bool = False,
+        normalize: bool = False,
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
@@ -176,7 +177,8 @@ class FeedForward(Module):
         self._layers = Sequential()
         for _ in range(num_hidden - 1):
             self._layers.append(Linear(dim_in, dim_hidden, bias=bias))
-            self._layers.append(RMSNorm(dim_hidden))
+            if normalize:
+                self._layers.append(RMSNorm(dim_hidden))
             self._layers.append(SwiGLU(dim_hidden))
             if dropout > 0.0:
                 self._layers.append(Dropout(dropout))
@@ -196,6 +198,7 @@ class TransformerBlock(Module):
         attn_num_heads: int,
         attn_causal: bool = True,
         ffd_num_hidden: int = 2,
+        ffd_bias: bool = False,
         ffd_dropout: float = 0.0,
     ) -> None:
         super().__init__()
@@ -208,7 +211,9 @@ class TransformerBlock(Module):
         self.norm_1 = RMSNorm(dim_emb)
         self.multihead_attn = MultiHeadAttention(seq_len, attn_num_heads, dim_emb, causal=attn_causal)
         self.norm_2 = RMSNorm(dim_emb)
-        self.feed_forward = FeedForward(dim_emb, dim_emb, num_hidden=ffd_num_hidden, dropout=ffd_dropout)
+        self.feed_forward = FeedForward(
+            dim_emb, dim_emb, num_hidden=ffd_num_hidden, bias=ffd_bias, dropout=ffd_dropout
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.pos_encoding(x)  # (bs, seq_len, dim_in)

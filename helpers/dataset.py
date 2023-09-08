@@ -1,4 +1,3 @@
-import os
 import torch
 from torch import Tensor
 from model.tokenizer import Tokenizer
@@ -11,11 +10,11 @@ class NextTokenPredictionDataset:
         self.input_file = input_file
         self.context_size = context_size
 
-        # load tokenized data in memory
+        # load data in memory
         with open(self.input_file) as f:
             data = f.read()
 
-        self.data = tokenizer.encode(data, beg_of_string=True, end_of_string=True)
+        self.data = tokenizer.encode(data)
 
     def get_batch(self, batch_size: int) -> Tensor:
         # sample random starting index in the data and build a batch from there
