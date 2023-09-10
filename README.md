@@ -18,7 +18,7 @@ Clone the repository:
 
 ### Dependencies
 
-The implementation only depends on Python and Pytorch:
+The implementation only depends on Python, Pytorch and sentencepiece for the tokenization:
 
 - python 3.11
 - pytorch 2.0.1
@@ -26,15 +26,15 @@ The implementation only depends on Python and Pytorch:
 
 ## Usage <a name = "usage"></a>
 
-Add notes about how to use the system.
+You can refer to the notebook in `example/shakespeare.ipynb` for an end-to-end pre-training example on a small dataset.
 
 ## What is Llama
 
-Let's go over some of the implementation details behind Llama large language model.
+Let's go over some of the implementation details behind the large language model in this repository.
 
 ### Transformer and attention mechanism
 
-The power of this model lies on chaining transformer blocks. A transformer block is composed of a succession of a positional encoding layer, a multi-head self-attention layer and a feed-forward network.
+The power of moden LLMs lies on chaining transformer blocks. A transformer block is composed of a succession of a positional encoding layer, a multi-head self-attention layer and a feed-forward network:
 
 ```
 TransformerBlock(
@@ -59,11 +59,13 @@ TransformerBlock(
 )
 ```
 
-Chaining such blocks allow to learn more and more abstract representations of the input, but always with this weighted linear decomposition mechanism using the entire context, and that is probably the reason why it works so well in practice.
+Chaining such blocks allow to learn more and more abstract representations of the input the deeper we go, but always with this weighted linear decomposition mechanism using the entire context.
 
 #### Positional encoding
 
-The positional encoding layer allows to make the subsequent layers "aware" of the relative or absolute position of each element in the input sequence. It is critical for modeling inputs where order is important (such as sentences) because the raw Self-attention block is position-invariant.
+The positional encoding layer allows to make the subsequent layers "aware" of the relative or absolute position of each element in the input sequence. It is critical for modeling inputs where order is important (such as sentences) because the self-attention mechanism is position-invariant.
+
+While Llama 2 uses the more recent Rotary positional encoding, we stick to the cosine positional encoding that was described in the [Attention Is All You Need](https://arxiv.org/abs/1706.03762) paper. It is defined as $` P(m, 2k) = sin( \frac{2m}{10000^{\frac{2k}{d_{emb}}}} ), P(m, 2k+1) = cos( \frac{2m}{10000^{\frac{2k}{d_{emb}}}} ) `$
 
 <p align="center"><img src="resources/cosine_positional_encoding.png?raw=true"/></p>
 

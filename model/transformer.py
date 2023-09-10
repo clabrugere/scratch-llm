@@ -14,11 +14,11 @@ class CosinePositionalEncoding(Module):
         super().__init__()
 
         indices = torch.arange(0, seq_len, dtype=torch.float)
-        div_term = 1 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb) + EPS)
+        scale = 1 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb) + EPS)
 
         position = torch.zeros(1, seq_len, dim_emb)
-        position[:, :, 0::2] = torch.sin(indices[None, :, None] * div_term)
-        position[:, :, 1::2] = torch.cos(indices[None, :, None] * div_term)
+        position[:, :, 0::2] = torch.sin(indices[None, :, None] * scale)
+        position[:, :, 1::2] = torch.cos(indices[None, :, None] * scale)
 
         self.register_buffer("position", position)
 
