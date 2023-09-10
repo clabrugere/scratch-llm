@@ -43,7 +43,7 @@ class RMSNorm(Module):
 
 class SwiGLU(Module):
     def __init__(self, dim_in: int, bias: bool = True) -> None:
-        # SwiGLU computes the output as SwiGLU(x) = (xW + b) ⊗ swish(xZ + c) where W, Z, b, c are learnable params
+        # SwiGLU(x) = (xW + b) ⊗ swish(xZ + c) where W, Z, b, c are learnable params
         super().__init__()
 
         self.dim_in = dim_in
