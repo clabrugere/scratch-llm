@@ -3,6 +3,9 @@ from torch import Tensor, IntTensor
 from sentencepiece import SentencePieceProcessor, SentencePieceTrainer
 
 
+__model_types = ["unigram", "bpe", "word", "char"]
+
+
 class Tokenizer:
     def __init__(self, path: str = None) -> None:
         self.sp = SentencePieceProcessor()
@@ -49,7 +52,17 @@ class Tokenizer:
         return out
 
 
-def train_tokenizer(input_file: str, vocab_size: int, output_path: str) -> None:
-    prefix = os.path.splitext(output_path)[0]
-    args = f"--input={input_file} --vocab_size={vocab_size} --model_prefix={prefix} --pad_id=0 --unk_id=1 --bos_id=2 --eos_id=3"
-    SentencePieceTrainer.Train(args)
+def train_tokenizer(
+    input_file: str, vocab_size: int, output_path: str, pad_id=0, unk_id=1, bod_id=2, eos_id=3, model_type="unigram"
+) -> None:
+    assert model_type in __model_types, f"Got invalid model_type argument: {model_type}"
+    SentencePieceTrainer.Train(
+        input=input_file,
+        vocab_size=vocab_size,
+        model_type=model_type,
+        model_prefix=os.path.splitext(output_path)[0],
+        pad_id=pad_id,
+        unk_id=unk_id,
+        bos_id=bod_id,
+        eos_id=eos_id,
+    )

@@ -1,6 +1,7 @@
 .DS_Store
 data/
 example/debug.ipynb
+example/wiki-french.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

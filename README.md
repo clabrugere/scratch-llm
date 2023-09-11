@@ -135,6 +135,8 @@ f_{\theta} = \text{argmin} \ L(X, Y)
 \textbf{y}_i = [t_1, ..., t_{T + 1}]_{i}
 ```
 
+<p align="center"><img src="resources/decoder-only.png?raw=true"/></p>
+
 ## References
 
 - [LLaMA: Open and Efficient Foundation Language Models](https://arxiv.org/abs/2302.13971)
