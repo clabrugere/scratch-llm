@@ -16,9 +16,9 @@ class CosinePositionalEncoding(Module):
         indices = torch.arange(0, seq_len, dtype=torch.float)
         scale = 1 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb) + EPS)
 
-        position = torch.zeros(1, seq_len, dim_emb)
-        position[:, :, 0::2] = torch.sin(indices[None, :, None] * scale)
-        position[:, :, 1::2] = torch.cos(indices[None, :, None] * scale)
+        position = torch.zeros(1, 1, seq_len, dim_emb)
+        position[:, :, :, 0::2] = torch.sin(indices[None, None, :, None] * scale)
+        position[:, :, :, 1::2] = torch.cos(indices[None, None, :, None] * scale)
 
         self.register_buffer("position", position)
 
@@ -31,14 +31,12 @@ class RMSNorm(Module):
     def __init__(self, dim_last: int, eps: float = EPS):
         super().__init__()
 
-        self.dim_last = dim_last
         self.eps = eps
-        self.gain = Parameter(torch.ones(self.dim_last), requires_grad=True)
+        self.gain = Parameter(torch.ones(dim_last), requires_grad=True)
 
     def forward(self, x: Tensor) -> Tensor:
-        # x is of shape (..., dim_last)
-        scale = torch.norm(x, dim=-1, keepdim=True) * (self.dim_last**-0.5)
-        return (x / (scale + self.eps)) * self.gain
+        scale = torch.rsqrt(torch.mean(x * x, dim=-1, keepdim=True))
+        return self.gain * x / (scale + self.eps)
 
 
 class SwiGLU(Module):
@@ -68,10 +66,10 @@ class SelfAttention(Module):
         self.causal = causal
 
         # Query, Key and Value projections
-        self.projection_query = Linear(dim_emb, dim_k, bias=False)
-        self.projection_key = Linear(dim_emb, dim_k, bias=False)
-        self.projection_value = Linear(dim_emb, dim_v, bias=False)
-        self.projection_out = Linear(dim_v, dim_v, bias=False)
+        self.proj_q = Linear(dim_emb, dim_k, bias=False)
+        self.proj_k = Linear(dim_emb, dim_k, bias=False)
+        self.proj_v = Linear(dim_emb, dim_v, bias=False)
+        self.proj_out = Linear(dim_v, dim_v, bias=False)
 
         # Build the causal mask, masking upper triangular part of attention scores
         causal_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
@@ -79,12 +77,12 @@ class SelfAttention(Module):
 
     def forward(self, x: Tensor, return_scores: bool = False) -> Tensor | Tuple[Tensor, Tensor]:
         # projects input to Q, K, V spaces
-        queries = self.projection_query(x)  # (bs, seq_len, dim_k)
-        keys = self.projection_key(x)  # (bs, seq_len, dim_k)
-        values = self.projection_value(x)  # (bs, seq_len, dim_v)
+        q = self.proj_q(x)  # (bs, seq_len, dim_k)
+        k = self.proj_k(x)  # (bs, seq_len, dim_k)
+        v = self.proj_v(x)  # (bs, seq_len, dim_v)
 
         # Compute the correlation between a query q_i and all the keys, for every q_i
-        attn_scores = queries @ torch.transpose(keys, 2, 1)  # (bs, seq_len, seq_len)
+        attn_scores = q @ torch.transpose(k, 2, 1)  # (bs, seq_len, seq_len)
 
         # Fill the upper triangular part of the attention scores with -inf to inhibit them in the softmax
         if self.causal:
@@ -92,7 +90,7 @@ class SelfAttention(Module):
             attn_scores.masked_fill_(self.causal_mask[None, ...], m_inf)
 
         attn_scores = torch.softmax(attn_scores * self.dim_k**-0.5, dim=-1)  # (bs, seq_len, seq_len)
-        out = self.projection_out(attn_scores @ values)  # (bs, seq_len, dim_v)
+        out = self.proj_out(attn_scores @ v)  # (bs, seq_len, dim_v)
 
         if return_scores:
             return out, attn_scores
@@ -119,11 +117,14 @@ class MultiHeadAttention(Module):
         self.dim_k = dim_k
         self.causal = causal
 
+        # positional encoding to be applied to query and key projections
+        self.positional_encoding = CosinePositionalEncoding(seq_len, dim_emb // num_heads)
+
         # Query, Key and Value projections
-        self.projection_query = Linear(dim_emb, dim_k, bias=False)
-        self.projection_key = Linear(dim_emb, dim_k, bias=False)
-        self.projection_value = Linear(dim_emb, dim_v, bias=False)
-        self.projection_out = Linear(dim_v, dim_v, bias=False)
+        self.proj_q = Linear(dim_emb, dim_k, bias=False)
+        self.proj_k = Linear(dim_emb, dim_k, bias=False)
+        self.proj_v = Linear(dim_emb, dim_v, bias=False)
+        self.proj_out = Linear(dim_v, dim_v, bias=False)
 
         # Build the causal mask, masking upper triangular part of attention scores
         causal_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
@@ -131,17 +132,21 @@ class MultiHeadAttention(Module):
 
     def forward(self, x: Tensor, return_scores: bool = False) -> Tensor | Tuple[Tensor, Tensor]:
         # projects input to Q, K, V spaces
-        queries = self.projection_query(x)  # (bs, seq_len, dim_k)
-        keys = self.projection_key(x)  # (bs, seq_len, dim_k)
-        values = self.projection_value(x)  # (bs, seq_len, dim_v)
+        q = self.proj_q(x)  # (bs, seq_len, dim_k)
+        k = self.proj_k(x)  # (bs, seq_len, dim_k)
+        v = self.proj_v(x)  # (bs, seq_len, dim_v)
 
         # split projections between heads -> (bs, num_heads, seq_len, dim_k)
-        queries = queries.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
-        keys = keys.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 3, 1)
-        values = values.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
+        q = q.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
+        k = k.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
+        v = v.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
+
+        # apply positional encoding to projections, for each heads
+        q = self.positional_encoding(q)  # (bs, num_heads, seq_len, dim_k)
+        k = self.positional_encoding(k)  # (bs, num_heads, seq_len, dim_k)
 
         # Compute the correlation between a query q_i and all the keys, for every q_i
-        attn_scores = queries @ keys  # (bs, num_heads, seq_len, seq_len)
+        attn_scores = (q @ k.permute(0, 1, 3, 2)) * self.dim_k**-0.5  # (bs, num_heads, seq_len, seq_len)
 
         # Fill the upper triangular part of the attention scores with -inf to inhibit them in the softmax
         if self.causal:
@@ -149,12 +154,14 @@ class MultiHeadAttention(Module):
             attn_scores.masked_fill_(self.causal_mask[None, None, ...], m_inf)
 
         # attention scores are used to build a weighted linear combination of values vectors
-        attn_scores = torch.softmax(attn_scores * self.dim_k**-0.5, dim=-1)  # (bs, num_heads, seq_len, seq_len)
-        out = attn_scores @ values  # (bs, num_heads, seq_len, dim_v)
+        attn_scores = torch.softmax(attn_scores, dim=-1)  # (bs, num_heads, seq_len, seq_len)
+        out = attn_scores @ v  # (bs, num_heads, seq_len, dim_v)
+
+        # merge heads
         out = out.permute(0, 2, 1, 3).contiguous().view(-1, self.seq_len, self.dim_k)  # (bs, seq_len, dim_v)
 
         # projects to the output space
-        out = self.projection_out(out)  # (bs, seq_len, dim_v)
+        out = self.proj_out(out)  # (bs, seq_len, dim_v)
 
         if return_scores:
             return out, attn_scores
@@ -204,10 +211,9 @@ class TransformerBlock(Module):
         super().__init__()
 
         # Follows LLama 2 architecture:
-        # - positional encoding at every block start
+        # - positional encoding on every head of the multi-head attention query and keys projections
         # - RMS pre-normalization instead of layer normalization
         # - SwiGLU activation for the feedforward
-        self.pos_encoding = CosinePositionalEncoding(seq_len, dim_emb)
         self.norm_1 = RMSNorm(dim_emb)
         self.multihead_attn = MultiHeadAttention(seq_len, attn_num_heads, dim_emb, causal=attn_causal)
         self.norm_2 = RMSNorm(dim_emb)
@@ -216,7 +222,6 @@ class TransformerBlock(Module):
         )
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.pos_encoding(x)  # (bs, seq_len, dim_in)
         x = x + self.multihead_attn(self.norm_1(x))  # (bs, seq_len, dim_in)
         x = x + self.feed_forward(self.norm_2(x))  # (bs, seq_len, dim_in)
 

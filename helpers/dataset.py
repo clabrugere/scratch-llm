@@ -20,6 +20,6 @@ class NextTokenPredictionDataset:
         # sample random starting index in the data and build a batch from there
         indices = torch.randint(self.data.size(0) - self.context_size, (batch_size,))
         inputs = torch.stack([self.data[i : i + self.context_size] for i in indices], dim=0)
-        labels = torch.stack([self.data[i + 1 : i + 1 + self.context_size] for i in indices], dim=0)
+        labels = torch.stack([self.data[i + 1 : i + 1 + self.context_size] for i in indices], dim=0).long()
 
         return inputs, labels

@@ -4,9 +4,9 @@ This repository contains a rather simple implementation of Meta's famous Llama l
 
 This implementation includes some of the improvements from Llama 2:
 
-- positional encoding before every transformer block,
+- positional encoding applied the query and key projections for each head in the multi-head self attention,
 - RMS pre-normalization in transformer blocks,
-- SwiGLU activation function.
+- SwiGLU activation function in the feed-forwards.
 
 To make the implementation end-to-end, we train the model on a small dataset using SentencePiece tokenizer.
 
@@ -38,20 +38,20 @@ The power of modern LLMs lies on chaining transformer blocks. A transformer bloc
 
 ```
 TransformerBlock(
-  (pos_encoding): CosinePositionalEncoding()
   (norm_1): RMSNorm()
   (multihead_attn): MultiHeadAttention(
-    (projection_query): Linear(in_features=128, out_features=128, bias=False)
-    (projection_key): Linear(in_features=128, out_features=128, bias=False)
-    (projection_value): Linear(in_features=128, out_features=128, bias=False)
-    (projection_out): Linear(in_features=128, out_features=128, bias=False)
+    (positional_encoding): CosinePositionalEncoding()
+    (proj_q): Linear(in_features=128, out_features=128, bias=False)
+    (proj_k): Linear(in_features=128, out_features=128, bias=False)
+    (proj_v): Linear(in_features=128, out_features=128, bias=False)
+    (proj_out): Linear(in_features=128, out_features=128, bias=False)
   )
   (norm_2): RMSNorm()
   (feed_forward): FeedForward(
     (_layers): Sequential(
       (0): Linear(in_features=128, out_features=128, bias=False)
       (1): SwiGLU(
-        (linear): Linear(in_features=128, out_features=256, bias=False)
+        (linear): Linear(in_features=128, out_features=256, bias=True)
       )
       (2): Linear(in_features=128, out_features=128, bias=False)
     )

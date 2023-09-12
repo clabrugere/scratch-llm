@@ -53,7 +53,15 @@ class Tokenizer:
 
 
 def train_tokenizer(
-    input_file: str, vocab_size: int, output_path: str, pad_id=0, unk_id=1, bod_id=2, eos_id=3, model_type="unigram"
+    input_file: str,
+    vocab_size: int,
+    output_path: str,
+    pad_id: int = 0,
+    unk_id: int = 1,
+    bod_id: int = 2,
+    eos_id: int = 3,
+    model_type: str = "unigram",
+    max_sample_size: int = 1_000_000,
 ) -> None:
     assert model_type in __model_types, f"Got invalid model_type argument: {model_type}"
     SentencePieceTrainer.Train(
@@ -65,4 +73,5 @@ def train_tokenizer(
         unk_id=unk_id,
         bos_id=bod_id,
         eos_id=eos_id,
+        input_sentence_size=max_sample_size,
     )

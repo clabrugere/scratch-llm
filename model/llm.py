@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Module, Sequential, Embedding, Linear, Dropout
 
-from model.transformer import TransformerBlock
+from model.transformer import TransformerBlock, RMSNorm
 
 
 class LLM(Module):
@@ -31,12 +31,14 @@ class LLM(Module):
                 for _ in range(num_layers)
             ]
         )
+        self.norm = RMSNorm(dim_emb)
         self.projection_head = Linear(dim_emb, vocab_size)
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.token_embedding(x)  # (bs, seq_len, dim_emb)
         x = self.emb_dropout(x)  # (bs, seq_len, dim_emb)
         x = self.transformer(x)  # (bs, seq_len, dim_emb)
+        x = self.norm(x)  # (bs, seq_len, dim_emb)
         x = self.projection_head(x)  # (bs, seq_len, vocab_size)
 
         return x  # (bs, seq_len, vocab_size)
