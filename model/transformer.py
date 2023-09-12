@@ -35,13 +35,13 @@ class RMSNorm(Module):
         self.gain = Parameter(torch.ones(dim_last), requires_grad=True)
 
     def forward(self, x: Tensor) -> Tensor:
-        scale = torch.rsqrt(torch.mean(x * x, dim=-1, keepdim=True))
-        return self.gain * x / (scale + self.eps)
+        scale = torch.rsqrt(torch.mean(x * x, dim=-1, keepdim=True) + self.eps)
+        return x * scale * self.gain
 
 
 class SwiGLU(Module):
+    # SwiGLU(x) = (xW + b) ⊗ swish(xZ + c) where W, Z, b, c are learnable params
     def __init__(self, dim_in: int, bias: bool = True) -> None:
-        # SwiGLU(x) = (xW + b) ⊗ swish(xZ + c) where W, Z, b, c are learnable params
         super().__init__()
 
         self.dim_in = dim_in
