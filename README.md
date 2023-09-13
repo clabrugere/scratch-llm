@@ -26,7 +26,7 @@ The implementation only depends on Python, Pytorch and sentencepiece:
 
 ## Usage <a name = "usage"></a>
 
-You can refer to the notebook in `example/shakespeare.ipynb` for an end-to-end pre-training example on a small dataset, with a small model of around 1000. The loss still decreases after 2000 iterations and the training loss is quite stable so we could train it further to improve its generative abilities.
+You can refer to the notebook in `example/shakespeare.ipynb` for an end-to-end pre-training example on a small dataset, with a model of around 10M parameters only. The loss still decreases after 2000 iterations and the training loss is quite stable so we could train it further to improve its generative abilities.
 
 <p align="center"><img src="resources/example-loss.png?raw=true"/></p>
 
