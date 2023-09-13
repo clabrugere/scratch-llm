@@ -44,7 +44,7 @@ class LLM(Module):
         return x  # (bs, seq_len, vocab_size)
 
     @torch.inference_mode()
-    def generate(self, inputs: Tensor, max_seq_len: int, temperature: float = 1.0, top_k: int = None) -> Tensor:
+    def generate(self, inputs: Tensor, max_seq_len: int, temperature: float = 1.0, top_p: int = None) -> Tensor:
         for _ in range(max_seq_len):
             # make sure the sequence we're generating doesn't exceed model's sequence length
             inputs_cond = inputs if inputs.size(1) <= self.context_size else inputs[:, -self.context_size :]
@@ -52,8 +52,7 @@ class LLM(Module):
             # get logits for the last sequence only, and rescale them to get a probability distribution over the vocabulary
             logits = self(inputs_cond)[:, -1, :]  # (bs, vocab_size)
 
-            # TODO: Top-k sampling: set the logits of the vocab_size - k tokens to -inf
-
+            # TODO: Top-p sampling (nucleus)
             probs = F.softmax(logits / temperature, dim=-1)  # (bs, vocab_size)
 
             # sample the next token index

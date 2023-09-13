@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from torch import Tensor, IntTensor
 from sentencepiece import SentencePieceProcessor, SentencePieceTrainer
 
@@ -55,7 +55,6 @@ class Tokenizer:
 def train_tokenizer(
     input_file: str,
     vocab_size: int,
-    output_path: str,
     pad_id: int = 0,
     unk_id: int = 1,
     bod_id: int = 2,
@@ -68,7 +67,7 @@ def train_tokenizer(
         input=input_file,
         vocab_size=vocab_size,
         model_type=model_type,
-        model_prefix=os.path.splitext(output_path)[0],
+        model_prefix=Path(input_file).with_suffix(""),
         pad_id=pad_id,
         unk_id=unk_id,
         bos_id=bod_id,

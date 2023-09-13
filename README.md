@@ -26,7 +26,9 @@ The implementation only depends on Python, Pytorch and sentencepiece:
 
 ## Usage <a name = "usage"></a>
 
-You can refer to the notebook in `example/shakespeare.ipynb` for an end-to-end pre-training example on a small dataset.
+You can refer to the notebook in `example/shakespeare.ipynb` for an end-to-end pre-training example on a small dataset, with a small model of around 1000. The loss still decreases after 2000 iterations and the training loss is quite stable so we could train it further to improve its generative abilities.
+
+<p align="center"><img src="resources/example-loss.png?raw=true"/></p>
 
 ## What is Llama
 
@@ -63,9 +65,9 @@ Chaining such blocks allow to learn more and more abstract representations of th
 
 #### Positional encoding
 
-The positional encoding layer allows to make the subsequent layers "aware" of the relative or absolute position of each element in the input sequence. It is critical for modeling data where order is important (such as sentences) because the self-attention mechanism is position-invariant.
+The positional encoding layer allows to make the self-attention layers "aware" of the relative or absolute position of each element in the input sequence. It is critical for modeling data where order is important (such as sentences) because the self-attention mechanism is position-invariant.
 
-While Llama 2 uses the more recent Rotary positional encoding, we stick to the cosine positional encoding that was described in the [Attention Is All You Need](https://arxiv.org/abs/1706.03762) paper. It is defined as:
+The original implementation of the Transformer as described in [Attention Is All You Need](https://arxiv.org/abs/1706.03762) used trigonometric functions in their cosine positional encoding, described as:
 
 ```math
 P(m, 2k) = sin( \frac{2m}{10000^{\frac{2k}{d*{emb}}}} )
@@ -76,6 +78,12 @@ P(m, 2k+1) = cos( \frac{2m}{10000^{\frac{2k}{d*{emb}}}} )
 ```
 
 <p align="center"><img src="resources/cosine_positional_encoding.png?raw=true"/></p>
+
+Llama 2 instead use a recent mechanism to encode position directly into self-attention query and key projections, named [RoFormer: Enhanced Transformer with Rotary Position Embedding](https://arxiv.org/abs/2104.09864). It is specifically designed to have a special key to encode positional information: let $ `f( x_i, p)` $ be the function encoding position of token $ `x` $ at position $`p`$, then the inner product of the positional encoding of two tokens at different positions $`p_x`$ and $`p_y`$ has the property:
+
+```math
+\langle f( x_i, p_x), f( y_i, p_y) \rangle = f(x_i y_i, p_x - p_y)
+```
 
 #### Multi-head self-attention
 
@@ -142,6 +150,7 @@ f_{\theta} = \text{argmin} \ L(X, Y)
 - [LLaMA: Open and Efficient Foundation Language Models](https://arxiv.org/abs/2302.13971)
 - [Llama 2: Open Foundation and Fine-Tuned Chat Models](https://arxiv.org/abs/2307.09288)
 - [Attention Is All You Need](https://arxiv.org/abs/1706.03762)
+- [RoFormer: Enhanced Transformer with Rotary Position Embedding](https://arxiv.org/abs/2104.09864)
 - [GLU Variants Improve Transformer](https://arxiv.org/abs/2002.05202)
 - [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467)
 - [SentencePiece](https://github.com/google/sentencepiece)

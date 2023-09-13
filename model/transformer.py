@@ -10,11 +10,11 @@ EPS = torch.finfo(torch.float32).eps
 
 
 class CosinePositionalEncoding(Module):
-    def __init__(self, seq_len: int, dim_emb: int, base: int = 10_000, eps: float = EPS):
+    def __init__(self, seq_len: int, dim_emb: int, base: int = 10_000, eps: float = EPS) -> None:
         super().__init__()
 
         indices = torch.arange(0, seq_len, dtype=torch.float)
-        scale = 1 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb) + EPS)
+        scale = 1 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb) + eps)
 
         position = torch.zeros(1, 1, seq_len, dim_emb)
         position[:, :, :, 0::2] = torch.sin(indices[None, None, :, None] * scale)
@@ -23,7 +23,33 @@ class CosinePositionalEncoding(Module):
         self.register_buffer("position", position)
 
     def forward(self, x: Tensor) -> Tensor:
-        return x + self.position  # (bs, seq_len, dim_in)
+        return x + self.position  # (bs, num_heads, seq_len, dim_emb)
+
+
+class RotaryPositionalEncoding(Module):
+    def __init__(self, seq_len: int, dim_emb: int, base: int = 10000, eps: float = EPS) -> None:
+        super().__init__()
+
+        self.dim_emb = dim_emb
+        indices = torch.arange(0, seq_len, dtype=torch.float)
+        scale = 1 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb) + eps)
+
+        position = torch.outer(indices, scale)
+        position = torch.cat((position, position), dim=-1)
+
+        position_cos = torch.cos(position[None, None, :, :])  # (bs, num_heads, seq_len, dim_emb)
+        position_sin = torch.sin(position[None, None, :, :])  # (bs, num_heads, seq_len, dim_emb)
+
+        self.register_buffer("position_cos", position_cos)
+        self.register_buffer("position_sin", position_sin)
+
+    def _rotate_half(self, x: Tensor) -> Tensor:
+        x1, x2 = x[..., : self.dim_emb // 2], x[..., self.dim_emb // 2 :]
+        return torch.cat((-x2, x1), dim=-1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x is of shape  (bs, num_heads, seq_len, dim_emb)
+        return (x * self.position_cos) + (self._rotate_half(x) * self.position_sin)
 
 
 class RMSNorm(Module):
@@ -118,7 +144,8 @@ class MultiHeadAttention(Module):
         self.causal = causal
 
         # positional encoding to be applied to query and key projections
-        self.positional_encoding = CosinePositionalEncoding(seq_len, dim_emb // num_heads)
+        # self.positional_encoding = CosinePositionalEncoding(seq_len, dim_emb // num_heads)
+        self.positional_encoding = RotaryPositionalEncoding(seq_len, dim_emb // num_heads)
 
         # Query, Key and Value projections
         self.proj_q = Linear(dim_emb, dim_k, bias=False)
