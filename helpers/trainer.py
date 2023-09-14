@@ -74,4 +74,4 @@ def evaluate(model: Module, dl_val: DataLoader, device: DEVICE) -> float:
         running_loss += loss.cpu().item()
         num_steps += 1
 
-    return loss / num_steps
+    return running_loss / num_steps
