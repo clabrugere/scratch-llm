@@ -18,7 +18,7 @@ Clone the repository:
 
 ### Dependencies
 
-The implementation only depends on Python, Pytorch and sentencepiece:
+The implementation only depends on Python, Pytorch and Sentencepiece:
 
 - python 3.11
 - pytorch 2.0.1
@@ -42,7 +42,7 @@ The power of modern LLMs lies on chaining transformer blocks. A transformer bloc
 TransformerBlock(
   (norm_1): RMSNorm()
   (multihead_attn): MultiHeadAttention(
-    (positional_encoding): CosinePositionalEncoding()
+    (positional_encoding): RotaryPositionalEncoding()
     (proj_q): Linear(in_features=128, out_features=128, bias=False)
     (proj_k): Linear(in_features=128, out_features=128, bias=False)
     (proj_v): Linear(in_features=128, out_features=128, bias=False)
@@ -89,7 +89,7 @@ Which means that two pairs of tokens with the same relative distance from each o
 
 #### Multi-head self-attention
 
-The multi-head self attention block basically learns, for a given element of the sequence, a linear combination of all the elements of the input projected into a "value" space, weighted by a similarity score between the projections in the "query" space and "key" space. In essence, it decomposes each elements of the input sequence into a linear combination of all the elements (including itself) where the weights are similarities that are learned through the projections. In the classic attention, the similarity metric is the dot-product.
+The multi-head self attention block learns - for a given element of the sequence - a linear combination of all the elements of the input projected into a "value" space, weighted by a similarity score between the projections in the "query" space and "key" space. In essence, it decomposes each elements of the input sequence into a linear combination of all the elements (including itself) where the weights are similarities that are learned through the projections. In the classic attention, the similarity metric is the dot-product.
 
 For NLP, this mechanism allows to encode the importance of the other tokens within the context, for a given token. To allow for parallel training, we impose the constraint that a given token can only be decomposed into a weighted sum of all the previous tokens and itself but not the tokens coming afterward (it is the concept of causal masking: every token in a sequence is a training example, so the attention processes the whole sequence at once). A clear advantage over previous approaches is that the whole context is accessible to a given token. The multi-head part is a way to learn different weights at the same time and thus provide different representations of the input sequence, allowing the model to be more expressive.
 
