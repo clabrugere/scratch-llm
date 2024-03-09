@@ -17,7 +17,7 @@ class NextTokenPredictionDataset:
 
         self.data = tokenizer.encode(data)
 
-    def get_batch(self, batch_size: int) -> Tensor:
+    def get_batch(self, batch_size: int) -> tuple[Tensor]:
         # sample random starting index in the data and build a batch from there
         indices = torch.randint(self.data.size(0) - self.context_size, (batch_size,))
         inputs = torch.stack([self.data[i : i + self.context_size] for i in indices], dim=0)

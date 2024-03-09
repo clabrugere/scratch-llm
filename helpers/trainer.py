@@ -7,8 +7,6 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
 
 def log(step, max_steps, lr, metrics, mode="train"):
     metrics_print = " - ".join([f"{m}: {v[-1]:.3f}" for m, v in metrics.items()])
@@ -22,18 +20,20 @@ def log(step, max_steps, lr, metrics, mode="train"):
 def train(
     model: Module,
     ds_train,
+    device: torch.device,
     batch_size: int,
     lr: float,
     max_steps: int,
     weight_decay: float = 1e-2,
-    device: str = DEVICE,
     log_every: int = 10,
 ) -> defaultdict:
-    metrics_tracker = defaultdict(list)
 
+    print(f"Training on {device}.")
+
+    metrics_tracker = defaultdict(list)
     model.to(device)
     optimizer = Adam(model.parameters(), lr=10 * lr, weight_decay=weight_decay)
-    scheduler = CosineAnnealingLR(optimizer, T_max=max_steps, eta_min=lr, verbose=False)
+    scheduler = CosineAnnealingLR(optimizer, T_max=max_steps, eta_min=lr)
     model.train()
 
     for step in range(max_steps):
@@ -60,7 +60,7 @@ def train(
 
 
 @torch.inference_mode()
-def evaluate(model: Module, dl_val: DataLoader, device: str = DEVICE) -> float:
+def evaluate(model: Module, dl_val: DataLoader, device: torch.device) -> float:
     model.eval()
     running_loss = 0.0
     num_steps = 0
