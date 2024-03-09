@@ -9,8 +9,8 @@ class LLMConfig:
     num_layers: int = 8
     num_heads: int = 8
     emb_dropout: float = 0.0
+    ffd_dim_hidden: int = 4 * 512
     ffd_bias: bool = True
-    ffd_dropout: float = 0.0
 
 
 @dataclass

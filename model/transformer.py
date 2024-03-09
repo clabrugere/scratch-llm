@@ -3,7 +3,7 @@ from typing import Tuple
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Dropout, Linear, Module, Parameter, Sequential
+from torch.nn import Linear, Module, Parameter, Sequential
 
 EPS = torch.finfo(torch.float32).eps
 
@@ -183,32 +183,13 @@ class MultiHeadAttention(Module):
             return out
 
 
-class FeedForward(Module):
-    def __init__(
-        self,
-        dim_in: int,
-        dim_hidden: int,
-        num_hidden,
-        bias: bool = False,
-        normalize: bool = False,
-        dropout: float = 0.0,
-    ) -> None:
-        super().__init__()
-
-        self._layers = Sequential()
-        for _ in range(num_hidden - 1):
-            self._layers.append(Linear(dim_in, dim_hidden, bias=bias))
-            if normalize:
-                self._layers.append(RMSNorm(dim_hidden))
-            self._layers.append(SwiGLU(dim_hidden))
-            if 0.0 < dropout < 1.0:
-                self._layers.append(Dropout(dropout))
-            dim_in = dim_hidden
-
-        self._layers.append(Linear(dim_in, dim_hidden, bias=bias))
-
-    def forward(self, x: Tensor) -> Tensor:
-        return self._layers(x)
+class FeedForward(Sequential):
+    def __init__(self, dim_in: int, dim_hidden: int, bias: bool = False) -> None:
+        super().__init__(
+            Linear(dim_in, dim_hidden, bias=bias),
+            SwiGLU(dim_hidden),
+            Linear(dim_hidden, dim_in, bias=bias),
+        )
 
 
 class TransformerBlock(Module):
@@ -217,10 +198,9 @@ class TransformerBlock(Module):
         seq_len: int,
         dim_emb: int,
         attn_num_heads: int,
+        ffn_hidden_dim: int,
+        ffn_bias: bool = False,
         attn_causal: bool = True,
-        ffd_num_hidden: int = 2,
-        ffd_bias: bool = False,
-        ffd_dropout: float = 0.0,
     ) -> None:
         super().__init__()
 
@@ -228,15 +208,13 @@ class TransformerBlock(Module):
         # - positional encoding on every head of the multi-head attention query and keys projections
         # - RMS pre-normalization instead of layer normalization
         # - SwiGLU activation for the feedforward
-        self.norm_1 = RMSNorm(dim_emb)
+        self.norm_attn = RMSNorm(dim_emb)
         self.multihead_attn = MultiHeadAttention(seq_len, attn_num_heads, dim_emb, causal=attn_causal)
-        self.norm_2 = RMSNorm(dim_emb)
-        self.feed_forward = FeedForward(
-            dim_emb, dim_emb, num_hidden=ffd_num_hidden, bias=ffd_bias, dropout=ffd_dropout
-        )
+        self.norm_ffn = RMSNorm(dim_emb)
+        self.feed_forward = FeedForward(dim_emb, ffn_hidden_dim, bias=ffn_bias)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x + self.multihead_attn(self.norm_1(x))  # (bs, seq_len, dim_in)
-        x = x + self.feed_forward(self.norm_2(x))  # (bs, seq_len, dim_in)
+        x = x + self.multihead_attn(self.norm_attn(x))  # (bs, seq_len, dim_in)
+        x = x + self.feed_forward(self.norm_ffn(x))  # (bs, seq_len, dim_in)
 
         return x  # (bs, seq_len, dim_in)

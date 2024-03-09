@@ -14,9 +14,9 @@ class LLM(Module):
         dim_emb: int,
         num_layers: int,
         attn_num_heads: int,
+        ffd_hidden_dim: int,
         emb_dropout: float = 0.0,
-        ffd_bias: bool = True,
-        ffd_dropout: float = 0.0,
+        ffd_bias: bool = False,
     ) -> None:
         super().__init__()
 
@@ -26,16 +26,7 @@ class LLM(Module):
         self.transformer = Sequential()
 
         for _ in range(num_layers):
-            self.transformer.append(
-                TransformerBlock(
-                    context_size,
-                    dim_emb,
-                    attn_num_heads,
-                    attn_causal=True,
-                    ffd_bias=ffd_bias,
-                    ffd_dropout=ffd_dropout,
-                )
-            )
+            self.transformer.append(TransformerBlock(context_size, dim_emb, attn_num_heads, ffd_hidden_dim, ffd_bias))
 
         self.norm = RMSNorm(dim_emb)
         self.projection_head = Linear(dim_emb, vocab_size)
