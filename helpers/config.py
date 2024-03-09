@@ -9,7 +9,7 @@ def get_device():
     elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
         device = torch.device("mps")
     else:
-        device = torch.device("cuda")
+        device = torch.device("cpu")
 
     return device
 
