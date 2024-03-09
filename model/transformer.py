@@ -1,10 +1,9 @@
 from typing import Tuple
-import torch
-from torch import Tensor
-from torch.nn import Module, Sequential, Linear, Dropout
-from torch.nn import Parameter
-import torch.nn.functional as F
 
+import torch
+import torch.nn.functional as F
+from torch import Tensor
+from torch.nn import Dropout, Linear, Module, Parameter, Sequential
 
 EPS = torch.finfo(torch.float32).eps
 
@@ -83,23 +82,18 @@ class SelfAttention(Module):
     def __init__(self, seq_len: int, dim_emb: int, dim_k: int = None, dim_v: int = None, causal=True) -> None:
         super().__init__()
 
-        if dim_k is None:
-            dim_k = dim_emb
-        if dim_v is None:
-            dim_v = dim_emb
-
-        self.dim_k = dim_k
+        self.dim_k = dim_k or dim_emb
+        self.dim_v = dim_v or dim_emb
         self.causal = causal
 
         # Query, Key and Value projections
-        self.proj_q = Linear(dim_emb, dim_k, bias=False)
-        self.proj_k = Linear(dim_emb, dim_k, bias=False)
-        self.proj_v = Linear(dim_emb, dim_v, bias=False)
-        self.proj_out = Linear(dim_v, dim_v, bias=False)
+        self.proj_q = Linear(dim_emb, self.dim_k, bias=False)
+        self.proj_k = Linear(dim_emb, self.dim_k, bias=False)
+        self.proj_v = Linear(dim_emb, self.dim_v, bias=False)
+        self.proj_out = Linear(self.dim_v, self.dim_v, bias=False)
 
         # Build the causal mask, masking upper triangular part of attention scores
-        causal_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
-        self.register_buffer("causal_mask", causal_mask)
+        self.register_buffer("causal_mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool())
 
     def forward(self, x: Tensor, return_scores: bool = False) -> Tensor | Tuple[Tensor, Tensor]:
         # projects input to Q, K, V spaces
@@ -112,8 +106,7 @@ class SelfAttention(Module):
 
         # Fill the upper triangular part of the attention scores with -inf to inhibit them in the softmax
         if self.causal:
-            m_inf = -torch.finfo(attn_scores.dtype).max
-            attn_scores.masked_fill_(self.causal_mask[None, ...], m_inf)
+            attn_scores.masked_fill_(self.causal_mask[None, ...], -torch.inf)
 
         attn_scores = torch.softmax(attn_scores * self.dim_k**-0.5, dim=-1)  # (bs, seq_len, seq_len)
         out = self.proj_out(attn_scores @ v)  # (bs, seq_len, dim_v)
@@ -132,15 +125,11 @@ class MultiHeadAttention(Module):
 
         assert dim_emb % num_heads == 0, "num_heads must be a multiple of dim_emb"
 
-        if dim_k is None:
-            dim_k = dim_emb
-        if dim_v is None:
-            dim_v = dim_emb
-
         self.seq_len = seq_len
         self.num_heads = num_heads
         self.dim_head = dim_emb // num_heads
-        self.dim_k = dim_k
+        self.dim_k = dim_k or dim_emb
+        self.dim_v = dim_v or dim_emb
         self.causal = causal
 
         # positional encoding to be applied to query and key projections
@@ -148,14 +137,13 @@ class MultiHeadAttention(Module):
         self.positional_encoding = RotaryPositionalEncoding(seq_len, dim_emb // num_heads)
 
         # Query, Key and Value projections
-        self.proj_q = Linear(dim_emb, dim_k, bias=False)
-        self.proj_k = Linear(dim_emb, dim_k, bias=False)
-        self.proj_v = Linear(dim_emb, dim_v, bias=False)
-        self.proj_out = Linear(dim_v, dim_v, bias=False)
+        self.proj_q = Linear(dim_emb, self.dim_k, bias=False)
+        self.proj_k = Linear(dim_emb, self.dim_k, bias=False)
+        self.proj_v = Linear(dim_emb, self.dim_v, bias=False)
+        self.proj_out = Linear(self.dim_v, self.dim_v, bias=False)
 
         # Build the causal mask, masking upper triangular part of attention scores
-        causal_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
-        self.register_buffer("causal_mask", causal_mask)
+        self.register_buffer("causal_mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool())
 
     def forward(self, x: Tensor, return_scores: bool = False) -> Tensor | Tuple[Tensor, Tensor]:
         # projects input to Q, K, V spaces
@@ -177,15 +165,14 @@ class MultiHeadAttention(Module):
 
         # Fill the upper triangular part of the attention scores with -inf to inhibit them in the softmax
         if self.causal:
-            m_inf = -torch.finfo(attn_scores.dtype).max
-            attn_scores.masked_fill_(self.causal_mask[None, None, ...], m_inf)
+            attn_scores.masked_fill_(self.causal_mask[None, None, ...], -torch.inf)
 
         # attention scores are used to build a weighted linear combination of values vectors
         attn_scores = torch.softmax(attn_scores, dim=-1)  # (bs, num_heads, seq_len, seq_len)
         out = attn_scores @ v  # (bs, num_heads, seq_len, dim_v)
 
         # merge heads
-        out = out.permute(0, 2, 1, 3).contiguous().view(-1, self.seq_len, self.dim_k)  # (bs, seq_len, dim_v)
+        out = out.permute(0, 2, 1, 3).contiguous().view(-1, self.seq_len, self.dim_v)  # (bs, seq_len, dim_v)
 
         # projects to the output space
         out = self.proj_out(out)  # (bs, seq_len, dim_v)
@@ -214,7 +201,7 @@ class FeedForward(Module):
             if normalize:
                 self._layers.append(RMSNorm(dim_hidden))
             self._layers.append(SwiGLU(dim_hidden))
-            if dropout > 0.0:
+            if 0.0 < dropout < 1.0:
                 self._layers.append(Dropout(dropout))
             dim_in = dim_hidden
 

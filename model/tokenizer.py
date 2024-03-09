@@ -1,7 +1,7 @@
 from pathlib import Path
-from torch import Tensor, IntTensor
-from sentencepiece import SentencePieceProcessor, SentencePieceTrainer
 
+from sentencepiece import SentencePieceProcessor, SentencePieceTrainer
+from torch import IntTensor, Tensor
 
 __model_types = ["unigram", "bpe", "word", "char"]
 

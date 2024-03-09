@@ -1,11 +1,11 @@
 from collections import defaultdict
 
 import torch
-from torch.nn import Module
-from torch.utils.data import DataLoader
 import torch.nn.functional as F
+from torch.nn import Module
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -30,7 +30,6 @@ def train(
     log_every: int = 10,
 ) -> defaultdict:
     metrics_tracker = defaultdict(list)
-    # val_loss_tracker = defaultdict(list)
 
     model.to(device)
     optimizer = Adam(model.parameters(), lr=10 * lr, weight_decay=weight_decay)
@@ -61,7 +60,7 @@ def train(
 
 
 @torch.inference_mode()
-def evaluate(model: Module, dl_val: DataLoader, device: DEVICE) -> float:
+def evaluate(model: Module, dl_val: DataLoader, device: str = DEVICE) -> float:
     model.eval()
     running_loss = 0.0
     num_steps = 0
