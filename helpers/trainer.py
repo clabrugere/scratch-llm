@@ -27,7 +27,6 @@ def train(
     weight_decay: float = 1e-2,
     log_every: int = 10,
 ) -> defaultdict:
-
     print(f"Training on {device}.")
 
     metrics_tracker = defaultdict(list)
@@ -52,9 +51,6 @@ def train(
         metrics_tracker["train_loss"].append(loss.detach().cpu().item())
         if step % log_every == 0 or step == max_steps - 1:
             log(step, max_steps, scheduler.get_last_lr()[-1], metrics_tracker)
-
-        # val_loss = evaluate(model, dl_val, device)
-        # val_loss_tracker["val_loss"].append(val_loss)
 
     return metrics_tracker
 
