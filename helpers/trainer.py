@@ -7,6 +7,8 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
+from helpers.dataset import NextTokenPredictionDataset
+
 
 def log(step, max_steps, lr, metrics, mode="train"):
     metrics_print = " - ".join([f"{m}: {v[-1]:.3f}" for m, v in metrics.items()])
@@ -19,7 +21,7 @@ def log(step, max_steps, lr, metrics, mode="train"):
 
 def train(
     model: Module,
-    ds_train,
+    ds_train: NextTokenPredictionDataset,
     device: torch.device,
     batch_size: int,
     lr: float,
