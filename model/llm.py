@@ -31,6 +31,9 @@ class LLM(Module):
         self.norm = RMSNorm(dim_emb)
         self.projection_head = Linear(dim_emb, vocab_size)
 
+        # https://paperswithcode.com/method/weight-tying
+        self.token_embedding.weight = self.projection_head.weight
+
     def forward(self, x: Tensor) -> Tensor:
         x = self.token_embedding(x)  # (bs, seq_len, dim_emb)
         x = self.emb_dropout(x)  # (bs, seq_len, dim_emb)
@@ -46,7 +49,7 @@ class LLM(Module):
             # make sure the sequence we're generating doesn't exceed model's sequence length
             inputs_cond = inputs if inputs.size(1) <= self.context_size else inputs[:, -self.context_size :]
 
-            # get logits for the last sequence only, and rescale them to get a probability distribution over the vocabulary
+            # get logits for the last step only, and rescale them to get a probability distribution over the vocabulary
             logits = self(inputs_cond)[:, -1, :]  # (bs, vocab_size)
 
             # TODO: Top-p sampling (nucleus)

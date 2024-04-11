@@ -22,7 +22,8 @@ class CosinePositionalEncoding(Module):
         self.register_buffer("position", position)
 
     def forward(self, x: Tensor) -> Tensor:
-        return x + self.position  # (bs, num_heads, seq_len, dim_emb)
+        x = x + self.position  # (bs, num_heads, seq_len, dim_emb)
+        return x
 
 
 class RotaryPositionalEncoding(Module):
@@ -44,24 +45,29 @@ class RotaryPositionalEncoding(Module):
 
     def _rotate_half(self, x: Tensor) -> Tensor:
         x1, x2 = x[..., : self.dim_emb // 2], x[..., self.dim_emb // 2 :]
+
         return torch.cat((-x2, x1), dim=-1)
 
     def forward(self, x: Tensor) -> Tensor:
         # x is of shape  (bs, num_heads, seq_len, dim_emb)
-        return (x * self.position_cos) + (self._rotate_half(x) * self.position_sin)
+        x = (x * self.position_cos) + (self._rotate_half(x) * self.position_sin)
+
+        return x
 
 
 class RMSNorm(Module):
     # RMSnorm(x_i) = (x_i / RMS(x)) * g_i where RMS(x) = sqrt(1 / n *  sum a_i ** 2)
     def __init__(self, dim_last: int, eps: float = EPS):
         super().__init__()
-
-        self.eps = eps
+        self.scale = dim_last**0.5
         self.gain = Parameter(torch.ones(dim_last), requires_grad=True)
+        self.eps = eps
 
     def forward(self, x: Tensor) -> Tensor:
-        scale = torch.rsqrt(torch.mean(x * x, dim=-1, keepdim=True) + self.eps)
-        return x * scale * self.gain
+        norm = torch.norm(x, 2, dim=-1, keepdim=True)
+        x = self.scale * self.gain * x / (norm + self.eps)
+
+        return x
 
 
 class SwiGLU(Module):
@@ -74,8 +80,10 @@ class SwiGLU(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         # uses only one weight matrix instead of two
-        out = self.linear(x)
-        return F.silu(out[..., : self.dim_in]) + out[..., self.dim_in :]
+        x = self.linear(x)
+        x = F.silu(x[..., : self.dim_in]) + x[..., self.dim_in :]
+
+        return x
 
 
 class SelfAttention(Module):
@@ -136,10 +144,8 @@ class MultiHeadAttention(Module):
         # self.positional_encoding = CosinePositionalEncoding(seq_len, dim_emb // num_heads)
         self.positional_encoding = RotaryPositionalEncoding(seq_len, dim_emb // num_heads)
 
-        # Query, Key and Value projections
-        self.proj_q = Linear(dim_emb, self.dim_k, bias=False)
-        self.proj_k = Linear(dim_emb, self.dim_k, bias=False)
-        self.proj_v = Linear(dim_emb, self.dim_v, bias=False)
+        # Query, Key and Value projections batched into one linear layer
+        self.proj_qkv = Linear(dim_emb, 3 * dim_emb, bias=False)
         self.proj_out = Linear(self.dim_v, self.dim_v, bias=False)
 
         # Build the causal mask, masking upper triangular part of attention scores
@@ -147,9 +153,10 @@ class MultiHeadAttention(Module):
 
     def forward(self, x: Tensor, return_scores: bool = False) -> Tensor | Tuple[Tensor, Tensor]:
         # projects input to Q, K, V spaces
-        q = self.proj_q(x)  # (bs, seq_len, dim_k)
-        k = self.proj_k(x)  # (bs, seq_len, dim_k)
-        v = self.proj_v(x)  # (bs, seq_len, dim_v)
+        qkv = self.proj_qkv(x)  # (bs, seq_len, 3 * dim_emb)
+
+        # split into Q, K, V
+        q, k, v = qkv.chunk(3, dim=-1)  # (bs, seq_len, dim_k), (bs, seq_len, dim_k), (bs, seq_len, dim_v)
 
         # split projections between heads -> (bs, num_heads, seq_len, dim_k)
         q = q.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
