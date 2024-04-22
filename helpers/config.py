@@ -17,13 +17,13 @@ def get_device():
 @dataclass
 class LLMConfig:
     vocab_size: int = 1024
-    context_size: int = 128
+    seq_len: int = 128
     dim_emb: int = 512
     num_layers: int = 8
     num_heads: int = 8
     emb_dropout: float = 0.0
-    ffd_dim_hidden: int = 4 * 512
-    ffd_bias: bool = True
+    ffn_dim_hidden: int = 4 * 512
+    ffn_bias: bool = True
 
 
 @dataclass
