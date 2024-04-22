@@ -10,23 +10,23 @@ class LLM(Module):
     def __init__(
         self,
         vocab_size: int,
-        context_size: int,
+        seq_len: int,
         dim_emb: int,
         num_layers: int,
         attn_num_heads: int,
-        ffd_hidden_dim: int,
+        ffn_hidden_dim: int,
         emb_dropout: float = 0.0,
         ffd_bias: bool = False,
     ) -> None:
         super().__init__()
 
-        self.context_size = context_size
+        self.seq_len = seq_len
         self.token_embedding = Embedding(vocab_size, dim_emb)
         self.emb_dropout = Dropout(emb_dropout)
         self.transformer = Sequential()
 
         for _ in range(num_layers):
-            self.transformer.append(TransformerBlock(context_size, dim_emb, attn_num_heads, ffd_hidden_dim, ffd_bias))
+            self.transformer.append(TransformerBlock(seq_len, dim_emb, attn_num_heads, ffn_hidden_dim, ffd_bias))
 
         self.norm = RMSNorm(dim_emb)
         self.projection_head = Linear(dim_emb, vocab_size)
@@ -43,20 +43,32 @@ class LLM(Module):
 
         return x  # (bs, seq_len, vocab_size)
 
+    @staticmethod
+    def sample_top_p(probs: Tensor, threshold: float) -> Tensor:
+        sorted_probs, sorted_indices = torch.sort(probs)  # (bs, vocab_size), (bs, vocab_size)
+        cumulative_probs = torch.cumsum(sorted_probs, dim=-1)  # (bs, vocab_size)
+
+        mask = cumulative_probs < threshold
+        sorted_probs[mask] = 0.0  # virtually discard tokens with lower probability
+        sorted_probs /= sorted_probs.sum(dim=-1, keepdim=True)  # rescale to sum to 1.0
+
+        next_token = torch.multinomial(sorted_probs, num_samples=1)
+        next_token = torch.gather(sorted_indices, dim=-1, index=next_token)
+
+        return next_token
+
     @torch.inference_mode()
-    def generate(self, inputs: Tensor, max_seq_len: int, temperature: float = 1.0, top_p: int = None) -> Tensor:
+    def generate(self, inputs: Tensor, max_seq_len: int, temperature: float = 0.6, top_p: int = 0.8) -> Tensor:
         for _ in range(max_seq_len):
             # make sure the sequence we're generating doesn't exceed model's sequence length
-            inputs_cond = inputs if inputs.size(1) <= self.context_size else inputs[:, -self.context_size :]
+            inputs_cond = inputs if inputs.size(1) <= self.seq_len else inputs[:, -self.seq_len :]
 
             # get logits for the last step only, and rescale them to get a probability distribution over the vocabulary
             logits = self(inputs_cond)[:, -1, :]  # (bs, vocab_size)
-
-            # TODO: Top-p sampling (nucleus)
             probs = F.softmax(logits / temperature, dim=-1)  # (bs, vocab_size)
 
-            # sample the next token index
-            next_token = torch.multinomial(probs, num_samples=1)
+            # sample the next token index using top-p sampling
+            next_token = self.sample_top_p(probs, top_p)  # (bs, 1)
 
             # append to the sequence being generated
             inputs = torch.cat((inputs, next_token), dim=-1)
