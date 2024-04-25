@@ -6,6 +6,20 @@ from torch.nn import Dropout, Embedding, Linear, Module, Sequential
 from model.transformer import RMSNorm, TransformerBlock
 
 
+def sample_top_p(probs: Tensor, threshold: float) -> Tensor:
+    sorted_probs, sorted_indices = torch.sort(probs, descending=True)  # (bs, vocab_size), (bs, vocab_size)
+    cumulative_probs = torch.cumsum(sorted_probs, dim=-1)  # (bs, vocab_size)
+
+    mask = cumulative_probs > threshold
+    sorted_probs[mask] = 0.0  # virtually discard tokens with lower probability
+    sorted_probs /= sorted_probs.sum(dim=-1, keepdim=True)  # rescale to sum to 1.0
+
+    next_token = torch.multinomial(sorted_probs, num_samples=1)
+    next_token = torch.gather(sorted_indices, dim=-1, index=next_token)
+
+    return next_token
+
+
 class LLM(Module):
     def __init__(
         self,
@@ -43,20 +57,6 @@ class LLM(Module):
 
         return x  # (bs, seq_len, vocab_size)
 
-    @staticmethod
-    def sample_top_p(probs: Tensor, threshold: float) -> Tensor:
-        sorted_probs, sorted_indices = torch.sort(probs)  # (bs, vocab_size), (bs, vocab_size)
-        cumulative_probs = torch.cumsum(sorted_probs, dim=-1)  # (bs, vocab_size)
-
-        mask = cumulative_probs < threshold
-        sorted_probs[mask] = 0.0  # virtually discard tokens with lower probability
-        sorted_probs /= sorted_probs.sum(dim=-1, keepdim=True)  # rescale to sum to 1.0
-
-        next_token = torch.multinomial(sorted_probs, num_samples=1)
-        next_token = torch.gather(sorted_indices, dim=-1, index=next_token)
-
-        return next_token
-
     @torch.inference_mode()
     def generate(self, inputs: Tensor, max_seq_len: int, temperature: float = 0.6, top_p: int = 0.8) -> Tensor:
         for _ in range(max_seq_len):
@@ -68,7 +68,7 @@ class LLM(Module):
             probs = F.softmax(logits / temperature, dim=-1)  # (bs, vocab_size)
 
             # sample the next token index using top-p sampling
-            next_token = self.sample_top_p(probs, top_p)  # (bs, 1)
+            next_token = sample_top_p(probs, top_p)  # (bs, 1)
 
             # append to the sequence being generated
             inputs = torch.cat((inputs, next_token), dim=-1)
