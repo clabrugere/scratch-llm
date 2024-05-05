@@ -1,28 +1,26 @@
 import torch
 from torch import Tensor
+from torch.utils.data import Dataset
 
 from model.tokenizer import Tokenizer
 
 
-class NextTokenPredictionDataset:
+class NextTokenPredictionDataset(Dataset):
     def __init__(self, input_file: str, context_size: int, tokenizer: Tokenizer) -> None:
         super().__init__()
-
-        self.input_file = input_file
         self.context_size = context_size
 
         # load data in memory
         data = []
-        with open(self.input_file) as f:
+        with open(input_file) as f:
             for line in f:
-                data.append(tokenizer.encode(line, beg_of_string=True, end_of_string=True))
+                line = line.strip()
+                data.extend(tokenizer.encode(line, end_of_string=True))
 
-        self.data = torch.cat(data, dim=0)
+        self.data = torch.tensor(data, dtype=torch.long)
 
-    def get_batch(self, batch_size: int) -> tuple[Tensor]:
-        # sample random starting index in the data and build a batch from there
-        indices = torch.randint(self.data.size(0) - self.context_size, (batch_size,))
-        inputs = torch.stack([self.data[i : i + self.context_size] for i in indices], dim=0)
-        labels = torch.stack([self.data[i + 1 : i + 1 + self.context_size] for i in indices], dim=0).long()
+    def __len__(self) -> int:
+        return len(self.data) - (self.context_size + 1)
 
-        return inputs, labels
+    def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
+        return self.data[idx : idx + self.context_size], self.data[idx + 1 : idx + self.context_size + 1]

@@ -58,7 +58,14 @@ class LLM(Module):
         return x  # (bs, seq_len, vocab_size)
 
     @torch.inference_mode()
-    def generate(self, inputs: Tensor, max_seq_len: int, temperature: float = 0.6, top_p: int = 0.8) -> Tensor:
+    def generate(
+        self,
+        inputs: Tensor,
+        max_seq_len: int,
+        stop_tokens: set | None = None,
+        temperature: float = 0.6,
+        top_p: int = 0.8,
+    ) -> Tensor:
         for _ in range(max_seq_len):
             # make sure the sequence we're generating doesn't exceed model's sequence length
             inputs_cond = inputs if inputs.size(1) <= self.seq_len else inputs[:, -self.seq_len :]
@@ -70,7 +77,11 @@ class LLM(Module):
             # sample the next token index using top-p sampling
             next_token = sample_top_p(probs, top_p)  # (bs, 1)
 
+            # stop generation when a stop token is generated
+            if stop_tokens is not None and next_token.item() in stop_tokens:
+                break
+
             # append to the sequence being generated
             inputs = torch.cat((inputs, next_token), dim=-1)
 
-        return inputs
+        return inputs.squeeze().cpu()

@@ -33,5 +33,5 @@ class TrainingConfig:
     batch_size: int = 64
     learning_rate: float = 1e-4
     weight_decay: float = 1e-2
-    max_steps: int = 1000
+    max_epochs: int = 1
     log_frequency: int = 10

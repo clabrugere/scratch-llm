@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from sentencepiece import SentencePieceProcessor, SentencePieceTrainer
-from torch import IntTensor, Tensor
 
 __model_types = ["unigram", "bpe", "word", "char"]
 
@@ -38,18 +37,16 @@ class Tokenizer:
         end_of_string: bool = False,
         pad_seq: bool = False,
         seq_len: int = None,
-    ) -> Tensor:
+    ) -> list[int]:
         out = self.sp.EncodeAsIds(input, add_bos=beg_of_string, add_eos=end_of_string)
 
         if pad_seq and len(out) < seq_len:
             out = [*[self.pad_id] * (seq_len - len(out)), *out]
 
-        return IntTensor(out)
-
-    def decode(self, input: Tensor) -> str:
-        out = "".join(self.sp.Decode(input.tolist()))
-
         return out
+
+    def decode(self, input: list[int]) -> str:
+        return "".join(self.sp.Decode(input))
 
 
 def train_tokenizer(
