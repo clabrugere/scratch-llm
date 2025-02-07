@@ -9,11 +9,11 @@ EPS = torch.finfo(torch.float32).eps
 
 
 class CosinePositionalEncoding(Module):
-    def __init__(self, seq_len: int, dim_emb: int, base: int = 10_000, eps: float = EPS) -> None:
+    def __init__(self, seq_len: int, dim_emb: int, base: int = 10_000) -> None:
         super().__init__()
 
         indices = torch.arange(0, seq_len, dtype=torch.float)
-        scale = 1 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb) + eps)
+        scale = 1.0 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb))
 
         position = torch.zeros(1, 1, seq_len, dim_emb)
         position[:, :, :, 0::2] = torch.sin(indices[None, None, :, None] * scale)
@@ -27,12 +27,12 @@ class CosinePositionalEncoding(Module):
 
 
 class RotaryPositionalEncoding(Module):
-    def __init__(self, seq_len: int, dim_emb: int, base: int = 10000, eps: float = EPS) -> None:
+    def __init__(self, seq_len: int, dim_emb: int, base: int = 10000) -> None:
         super().__init__()
 
         self.dim_emb = dim_emb
         indices = torch.arange(0, seq_len, dtype=torch.float)
-        scale = 1 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb) + eps)
+        scale = 1.0 / (base ** (torch.arange(0, dim_emb, 2, dtype=torch.float) / dim_emb))
 
         position = torch.outer(indices, scale)
         position = torch.cat((position, position), dim=-1)
@@ -81,7 +81,7 @@ class SwiGLU(Module):
     def forward(self, x: Tensor) -> Tensor:
         # uses only one weight matrix instead of two
         x = self.linear(x)
-        x = F.silu(x[..., : self.dim_in]) + x[..., self.dim_in :]
+        x = F.silu(x[..., : self.dim_in]) * x[..., self.dim_in :]
 
         return x
 
