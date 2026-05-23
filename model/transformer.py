@@ -3,9 +3,7 @@ from typing import Tuple
 import torch
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Linear, Module, Parameter, Sequential
-
-EPS = torch.finfo(torch.float32).eps
+from torch.nn import Linear, Module, ModuleList, Parameter, Sequential
 
 
 class CosinePositionalEncoding(Module):
@@ -57,7 +55,7 @@ class RotaryPositionalEncoding(Module):
 
 class RMSNorm(Module):
     # RMSnorm(x_i) = (x_i / RMS(x)) * g_i where RMS(x) = sqrt(1 / n *  sum a_i ** 2)
-    def __init__(self, dim_last: int, eps: float = EPS):
+    def __init__(self, dim_last: int, eps: float = 1e-8):
         super().__init__()
         self.scale = dim_last**0.5
         self.gain = Parameter(torch.ones(dim_last), requires_grad=True)
@@ -126,9 +124,7 @@ class SelfAttention(Module):
 
 
 class MultiHeadAttention(Module):
-    def __init__(
-        self, seq_len: int, num_heads: int, dim_emb: int, dim_k: int = None, dim_v: int = None, causal=True
-    ) -> None:
+    def __init__(self, seq_len: int, num_heads: int, dim_emb: int, causal=True) -> None:
         super().__init__()
 
         assert dim_emb % num_heads == 0, "num_heads must be a multiple of dim_emb"
@@ -136,8 +132,7 @@ class MultiHeadAttention(Module):
         self.seq_len = seq_len
         self.num_heads = num_heads
         self.dim_head = dim_emb // num_heads
-        self.dim_k = dim_k or dim_emb
-        self.dim_v = dim_v or dim_emb
+        self.dim_emb = dim_emb
         self.causal = causal
 
         # positional encoding to be applied to query and key projections
@@ -146,29 +141,38 @@ class MultiHeadAttention(Module):
 
         # Query, Key and Value projections batched into one linear layer
         self.proj_qkv = Linear(dim_emb, 3 * dim_emb, bias=False)
-        self.proj_out = Linear(self.dim_v, self.dim_v, bias=False)
+        self.proj_out = Linear(dim_emb, dim_emb, bias=False)
 
         # Build the causal mask, masking upper triangular part of attention scores
         self.register_buffer("causal_mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool())
 
-    def forward(self, x: Tensor, return_scores: bool = False) -> Tensor | Tuple[Tensor, Tensor]:
+    def forward(
+        self,
+        x: Tensor,
+        attn_mask: Tensor | None = None,
+        return_scores: bool = False,
+    ) -> Tensor | Tuple[Tensor, Tensor]:
         # projects input to Q, K, V spaces
         qkv = self.proj_qkv(x)  # (bs, seq_len, 3 * dim_emb)
 
         # split into Q, K, V
-        q, k, v = qkv.chunk(3, dim=-1)  # (bs, seq_len, dim_k), (bs, seq_len, dim_k), (bs, seq_len, dim_v)
+        q, k, v = qkv.chunk(3, dim=-1)  # (bs, seq_len, dim_emb), (bs, seq_len, dim_emb), (bs, seq_len, dim_v)
 
-        # split projections between heads -> (bs, num_heads, seq_len, dim_k)
+        # split projections between heads -> (bs, num_heads, seq_len, dim_emb)
         q = q.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
         k = k.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
         v = v.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
 
         # apply positional encoding to projections, for each heads
-        q = self.positional_encoding(q)  # (bs, num_heads, seq_len, dim_k)
-        k = self.positional_encoding(k)  # (bs, num_heads, seq_len, dim_k)
+        q = self.positional_encoding(q)  # (bs, num_heads, seq_len, dim_emb)
+        k = self.positional_encoding(k)  # (bs, num_heads, seq_len, dim_emb)
 
         # Compute the correlation between a query q_i and all the keys, for every q_i
-        attn_scores = (q @ k.permute(0, 1, 3, 2)) * self.dim_k**-0.5  # (bs, num_heads, seq_len, seq_len)
+        attn_scores = (q @ k.permute(0, 1, 3, 2)) * self.dim_emb**-0.5  # (bs, num_heads, seq_len, seq_len)
+
+        # Discard masked tokens from the attention matrix
+        if attn_mask is not None:
+            attn_scores.masked_fill_(attn_mask, -torch.inf)
 
         # Fill the upper triangular part of the attention scores with -inf to inhibit them in the softmax
         if self.causal:
@@ -179,7 +183,7 @@ class MultiHeadAttention(Module):
         out = attn_scores @ v  # (bs, num_heads, seq_len, dim_v)
 
         # merge heads
-        out = out.permute(0, 2, 1, 3).contiguous().view(-1, self.seq_len, self.dim_v)  # (bs, seq_len, dim_v)
+        out = out.permute(0, 2, 1, 3).contiguous().view(-1, self.seq_len, self.dim_emb)  # (bs, seq_len, dim_v)
 
         # projects to the output space
         out = self.proj_out(out)  # (bs, seq_len, dim_v)
@@ -211,17 +215,34 @@ class TransformerBlock(Module):
     ) -> None:
         super().__init__()
 
-        # Follows LLama 2 architecture:
-        # - positional encoding on every head of the multi-head attention query and keys projections
-        # - RMS pre-normalization instead of layer normalization
-        # - SwiGLU activation for the feedforward
         self.norm_attn = RMSNorm(dim_emb)
         self.multihead_attn = MultiHeadAttention(seq_len, attn_num_heads, dim_emb, causal=attn_causal)
         self.norm_ffn = RMSNorm(dim_emb)
         self.feed_forward = FeedForward(dim_emb, ffn_hidden_dim, bias=ffn_bias)
 
-    def forward(self, x: Tensor) -> Tensor:
-        x = x + self.multihead_attn(self.norm_attn(x))  # (bs, seq_len, dim_in)
+    def forward(self, x: Tensor, attn_mask: Tensor | None = None) -> tuple[Tensor, Tensor | None]:
+        x = x + self.multihead_attn(self.norm_attn(x), attn_mask)  # (bs, seq_len, dim_in)
         x = x + self.feed_forward(self.norm_ffn(x))  # (bs, seq_len, dim_in)
 
-        return x  # (bs, seq_len, dim_in)
+        return x, attn_mask  # (bs, seq_len, dim_in)
+
+
+class TransformerStack(Module):
+    def __init__(
+        self,
+        num_layers: int,
+        seq_len: int,
+        dim_emb: int,
+        attn_num_heads: int,
+        ffn_hidden_dim: int,
+    ):
+        super().__init__()
+        self.blocks = ModuleList(
+            TransformerBlock(seq_len, dim_emb, attn_num_heads, ffn_hidden_dim) for _ in range(num_layers)
+        )
+
+    def forward(self, x: Tensor, attn_mask: Tensor = None) -> Tensor:
+        for block in self.blocks:
+            x, attn_mask = block(x, attn_mask)
+
+        return x

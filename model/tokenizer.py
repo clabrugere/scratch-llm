@@ -54,9 +54,9 @@ def train_tokenizer(
     vocab_size: int,
     pad_id: int = 0,
     unk_id: int = 1,
-    bod_id: int = 2,
+    bos_id: int = 2,
     eos_id: int = 3,
-    model_type: str = "unigram",
+    model_type: str = "bpe",
     max_sample_size: int = 1_000_000,
 ) -> None:
     assert model_type in __model_types, f"Got invalid model_type argument: {model_type}"
@@ -67,7 +67,7 @@ def train_tokenizer(
         model_prefix=Path(input_file).with_suffix(""),
         pad_id=pad_id,
         unk_id=unk_id,
-        bos_id=bod_id,
+        bos_id=bos_id,
         eos_id=eos_id,
         input_sentence_size=max_sample_size,
     )
