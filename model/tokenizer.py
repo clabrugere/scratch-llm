@@ -13,7 +13,7 @@ class TokenSequence:
 
     def __init__(self, values: list[int]):
         n = len(values)
-        self.vals = list(values)
+        self.values = values
         self.left = list(range(-1, n - 1))
         self.right = list(range(1, n + 1))
         self.n = n
@@ -34,7 +34,7 @@ class TokenSequence:
     def __iter__(self):
         i = 0
         while i < self.n:
-            yield i, self.vals[i]
+            yield i, self.values[i]
             i = self.right[i]
 
     def __len__(self):
@@ -45,43 +45,43 @@ class PairIndex:
     """Tracks pair frequencies and their positions for incremental BPE training."""
 
     def __init__(self):
-        self._counts: Counter = Counter()
-        self._positions: dict[tuple, set] = defaultdict(set)
-        self._heap: list = []
+        self.counts = Counter()
+        self.positions = defaultdict(set)
+        self.heap = []
 
     def add(self, pair: tuple[int, int], pos: int) -> None:
         """Record that pair starts at pos."""
-        self._counts[pair] += 1
-        self._positions[pair].add(pos)
-        heapq.heappush(self._heap, (-self._counts[pair], pair))
+        self.counts[pair] += 1
+        self.positions[pair].add(pos)
+        heapq.heappush(self.heap, (-self.counts[pair], pair))
 
     def remove(self, pair: tuple[int, int], pos: int) -> None:
         """Remove the occurrence of pair at pos."""
-        self._counts[pair] -= 1
-        self._positions[pair].discard(pos)
-        if self._counts[pair] > 0:
-            heapq.heappush(self._heap, (-self._counts[pair], pair))
+        self.counts[pair] -= 1
+        self.positions[pair].discard(pos)
+        if self.counts[pair] > 0:
+            heapq.heappush(self.heap, (-self.counts[pair], pair))
         else:
-            del self._counts[pair]
-            del self._positions[pair]
+            del self.counts[pair]
+            del self.positions[pair]
 
     def most_frequent(self) -> tuple[tuple[int, int], int]:
         """Return the pair with the highest count, skipping stale heap entries."""
-        while self._heap:
-            neg_count, pair = self._heap[0]
+        while self.heap:
+            neg_count, pair = self.heap[0]
             count = -neg_count
             # stale if count no longer matches (pair was updated or removed since push)
-            if self._counts.get(pair, 0) == count:
+            if self.counts.get(pair, 0) == count:
                 return pair, count
-            heapq.heappop(self._heap)
+            heapq.heappop(self.heap)
 
     def pop(self, pair: tuple[int, int]) -> set[int]:
         """Return all positions for pair and remove it from the index."""
-        del self._counts[pair]
-        return self._positions.pop(pair)
+        del self.counts[pair]
+        return self.positions.pop(pair)
 
     def __bool__(self) -> bool:
-        return bool(self._counts)
+        return bool(self.counts)
 
 
 class BPETokenizer:
@@ -122,7 +122,7 @@ class BPETokenizer:
         index = PairIndex()
         for pos, token in seq:
             if seq.has_right(pos):
-                index.add((token, seq.vals[seq.right[pos]]), pos)
+                index.add((token, seq.values[seq.right[pos]]), pos)
 
         while self.vocab_size < self.max_vocab_size:
             if not index:
@@ -150,16 +150,16 @@ class BPETokenizer:
                 # left boundary: (left_token, pair[0]) -> (left_token, new_id)
                 if seq.has_left(pos):
                     left_pos = seq.left[pos]
-                    index.remove((seq.vals[left_pos], pair[0]), left_pos)
-                    index.add((seq.vals[left_pos], new_id), left_pos)
+                    index.remove((seq.values[left_pos], pair[0]), left_pos)
+                    index.add((seq.values[left_pos], new_id), left_pos)
 
                 # right boundary: (pair[1], right_right_token) -> (new_id, right_right_token)
                 if seq.has_right(right_pos):
                     right_right_pos = seq.right[right_pos]
-                    index.remove((pair[1], seq.vals[right_right_pos]), right_pos)
-                    index.add((new_id, seq.vals[right_right_pos]), pos)
+                    index.remove((pair[1], seq.values[right_right_pos]), right_pos)
+                    index.add((new_id, seq.values[right_right_pos]), pos)
 
-                seq.vals[pos] = new_id
+                seq.values[pos] = new_id
                 seq.delete(right_pos)
 
     def _encode_non_special(self, input: str) -> list[int]:
@@ -167,15 +167,15 @@ class BPETokenizer:
         seq = TokenSequence(string_to_byte(input, "utf-8"))
 
         if len(seq) < 2:
-            return seq.vals
+            return seq.values
 
         # seed the heap with all mergeable adjacent pairs; merge ID doubles as priority (lower = earlier learned)
         heap = []
         for pos, token in seq:
             if seq.has_right(pos):
-                pair = (token, seq.vals[seq.right[pos]])
+                pair = (token, seq.values[seq.right[pos]])
                 if pair in self.pairs:
-                    heapq.heappush(heap, (self.pairs[pair], pos, token, seq.vals[seq.right[pos]]))
+                    heapq.heappush(heap, (self.pairs[pair], pos, token, seq.values[seq.right[pos]]))
 
         while heap:
             # heap entry stores expected token values at push time for stale-entry detection
@@ -185,25 +185,25 @@ class BPETokenizer:
             right_pos = seq.right[pos]
             if (
                 right_pos >= seq.n
-                or seq.vals[pos] != expected_left
-                or seq.vals[right_pos] != expected_right
+                or seq.values[pos] != expected_left
+                or seq.values[right_pos] != expected_right
                 or seq.left[right_pos] != pos
             ):
                 continue
 
             # apply merge: overwrite left token with merged ID, remove right token from the sequence
-            seq.vals[pos] = merged_id
+            seq.values[pos] = merged_id
             seq.delete(right_pos)
 
             # only the two boundary pairs are affected; push them if they have a merge
             if seq.has_left(pos):
-                pair = (seq.vals[seq.left[pos]], merged_id)
+                pair = (seq.values[seq.left[pos]], merged_id)
                 if pair in self.pairs:
-                    heapq.heappush(heap, (self.pairs[pair], seq.left[pos], seq.vals[seq.left[pos]], merged_id))
+                    heapq.heappush(heap, (self.pairs[pair], seq.left[pos], seq.values[seq.left[pos]], merged_id))
             if seq.has_right(pos):
-                pair = (merged_id, seq.vals[seq.right[pos]])
+                pair = (merged_id, seq.values[seq.right[pos]])
                 if pair in self.pairs:
-                    heapq.heappush(heap, (self.pairs[pair], pos, merged_id, seq.vals[seq.right[pos]]))
+                    heapq.heappush(heap, (self.pairs[pair], pos, merged_id, seq.values[seq.right[pos]]))
 
         return [token for _, token in seq]
 
