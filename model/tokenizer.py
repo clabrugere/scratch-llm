@@ -229,7 +229,7 @@ class BPETokenizer:
 
         return indices
 
-    def decode(self, indices: list[int], skip_special_tokens: bool = False) -> str:
+    def decode(self, indices: list[int], skip_special_tokens: bool = True) -> str:
         """Decode a list of token IDs back into a string."""
         decoded = []
 
