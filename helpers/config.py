@@ -27,7 +27,7 @@ class LLMConfig:
 
 @dataclass
 class TrainingConfig:
-    tokenizer_max_training_length: int
+    tokenizer_max_training_length: int | None
     device: torch.device
     batch_size: int
     learning_rate: float

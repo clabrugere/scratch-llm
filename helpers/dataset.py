@@ -14,9 +14,11 @@ class NextTokenPredictionDataset(Dataset):
         data = []
         with open(input_file) as f:
             for line in f:
-                data.extend(tokenizer.encode(line.strip()))
-                if eos_id is not None:
+                stripped = line.strip()
+                if stripped == "" and eos_id is not None:
                     data.append(eos_id)
+                else:
+                    data.extend(tokenizer.encode(stripped + "\n"))
 
         self.data = torch.as_tensor(data, dtype=torch.long)
 

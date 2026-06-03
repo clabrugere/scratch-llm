@@ -48,7 +48,8 @@ class RotaryPositionalEncoding(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         # x is of shape  (bs, num_heads, seq_len, dim_emb)
-        x = (x * self.position_cos) + (self._rotate_half(x) * self.position_sin)
+        seq_len = x.size(2)
+        x = (x * self.position_cos[:, :, :seq_len, :]) + (self._rotate_half(x) * self.position_sin[:, :, :seq_len, :])
 
         return x
 
@@ -158,10 +159,13 @@ class MultiHeadAttention(Module):
         # split into Q, K, V
         q, k, v = qkv.chunk(3, dim=-1)  # (bs, seq_len, dim_emb), (bs, seq_len, dim_emb), (bs, seq_len, dim_v)
 
+        # use actual sequence length (may be shorter than self.seq_len during inference)
+        bs, seq_len, _ = x.shape
+
         # split projections between heads -> (bs, num_heads, seq_len, dim_emb)
-        q = q.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
-        k = k.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
-        v = v.view(-1, self.seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
+        q = q.view(bs, seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
+        k = k.view(bs, seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
+        v = v.view(bs, seq_len, self.num_heads, self.dim_head).permute(0, 2, 1, 3)
 
         # apply positional encoding to projections, for each heads
         q = self.positional_encoding(q)  # (bs, num_heads, seq_len, dim_emb)
@@ -176,14 +180,14 @@ class MultiHeadAttention(Module):
 
         # Fill the upper triangular part of the attention scores with -inf to inhibit them in the softmax
         if self.causal:
-            attn_scores.masked_fill_(self.causal_mask[None, None, ...], -torch.inf)
+            attn_scores.masked_fill_(self.causal_mask[None, None, :seq_len, :seq_len], -torch.inf)
 
         # attention scores are used to build a weighted linear combination of values vectors
         attn_scores = torch.softmax(attn_scores, dim=-1)  # (bs, num_heads, seq_len, seq_len)
         out = attn_scores @ v  # (bs, num_heads, seq_len, dim_v)
 
         # merge heads
-        out = out.permute(0, 2, 1, 3).contiguous().view(-1, self.seq_len, self.dim_emb)  # (bs, seq_len, dim_v)
+        out = out.permute(0, 2, 1, 3).contiguous().view(bs, seq_len, self.dim_emb)  # (bs, seq_len, dim_v)
 
         # projects to the output space
         out = self.proj_out(out)  # (bs, seq_len, dim_v)
