@@ -169,7 +169,7 @@ class BPETokenizer:
         if len(seq) < 2:
             return seq.values
 
-        # seed the heap with all mergeable adjacent pairs; merge ID doubles as priority (lower = earlier learned)
+        # seed the heap with all mergeable adjacent pairs; merge ID doubles as priority (lower = learned earlier)
         heap = []
         for pos, token in seq:
             if seq.has_right(pos):

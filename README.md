@@ -156,7 +156,7 @@ Knowing which pair to merge next requires the most frequent pair across the enti
 
 `PairIndex` maintains a max-heap of `(-count, pair)` entries alongside a `Counter` of live frequencies. The key insight is that each merge only affects two *boundary pairs*: if $(a, b) \to c$ is applied at position $i$, only the pair to the left of $i$ and the pair to the right of $i+1$ change — everything else in the sequence is untouched. After applying a merge, `PairIndex` removes the two stale boundary pairs and adds the two updated ones, each costing $O(\log n)$.
 
-The heap is *lazy*: when a pair's count changes, a new heap entry is pushed rather than updating the existing one. Stale entries (where the heap's stored count no longer matches the live `Counter`) are detected and skipped on pop. The heap is never explicitly cleaned up; stale entries are simply ignored as they surface.
+The heap is *lazy*: when a pair's count changes, a new heap entry is pushed rather than updating the existing one (it would cost a linear scan and re-heapify otherwise, so we trade this for a bit of additional memory instead). Stale entries (where the heap's stored count no longer matches the live `Counter`) are detected and skipped on pop. The heap is never explicitly cleaned up; stale entries are simply ignored as they surface.
 
 Combined, these two structures reduce training from $O(nV)$ to $O(n \log n)$ and encoding from $O(nV)$ to $O(n \log V)$.
 
