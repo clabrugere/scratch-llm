@@ -29,8 +29,8 @@ class LLMConfig:
 class TrainingConfig:
     tokenizer_max_training_length: int | None
     device: torch.device
+    num_steps: int
     batch_size: int
     learning_rate: float
     weight_decay: float
-    max_epochs: int
     log_frequency: int
