@@ -8,7 +8,7 @@ This implementation includes some of the improvements from Llama 2:
 - RMS pre-normalization in transformer blocks,
 - SwiGLU activation function in the feed-forwards.
 
-To make the implementation end-to-end, we train the model on a small dataset using SentencePiece tokenizer.
+To make the implementation end-to-end, we train the model on a small dataset using a custom BPE tokenizer.
 
 ## Getting Started <a name = "getting_started"></a>
 
@@ -18,11 +18,10 @@ Clone the repository:
 
 ### Dependencies
 
-The implementation only depends on Python, Pytorch and Sentencepiece:
+The implementation only depends on Python and Pytorch:
 
 - python 3.11
-- pytorch 2.0.1
-- sentencepiece 0.1.99
+- pytorch 2.6+
 
 ## Usage <a name = "usage"></a>
 
@@ -127,6 +126,40 @@ Authors of [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.074
 
 where $`\textbf{g}`$ is a learned parameter.
 
+### BPE Tokenizer
+
+Before a model can process text, it must be converted into a sequence of integer IDs. Byte Pair Encoding (BPE) is the algorithm used by most modern LLMs to build that vocabulary.
+
+#### How BPE works
+
+The vocabulary starts as 256 tokens, one per possible byte value. Because the input text is UTF-8 encoded at the byte level, the tokenizer can represent any string without out-of-vocabulary tokens.
+
+Training then iteratively extends the vocabulary: find the most frequent adjacent pair of token IDs in the training corpus, assign it a new ID, replace every occurrence of that pair with the new ID, and repeat until `max_vocab_size` is reached. Each new token is the concatenation of the two bytes or token sequences it was merged from, so decoding is always a straightforward lookup. This allows to trade vocabulary size with compressed inputs (and so virtually increasing the context at fixed sequence length).
+
+Encoding a new string applies the learned merges in the order they were learned: a merge with a lower ID was learned earlier (on a more frequent pair) and therefore has higher priority. Two adjacent tokens that can be merged are replaced by their merged ID, and the process repeats until no more merges apply.
+
+#### Why a naive implementation is slow
+
+A straightforward implementation of training re-scans the entire token sequence after every merge to recount all pair frequencies. With a training corpus of $n$ bytes and $V$ merges to learn, this is $O(nV)$, prohibitively slow for large vocabularies or large corpora.
+
+Encoding has the same problem: applying each merge requires another full pass over the sequence.
+
+#### `TokenSequence`: O(1) deletion via a doubly-linked list
+
+When two adjacent tokens at positions $i$ and $i+1$ are merged into a single token, the right token must be removed from the sequence. Doing this in a plain array requires shifting every subsequent element, $O(n)$ per merge.
+
+`TokenSequence` represents the sequence as a doubly-linked list backed by two plain integer arrays (`left[i]`, `right[i]`). Removing node $i+1$ is a constant-time pointer update: link $i$ directly to $i+2$, and link $i+2$ back to $i$. No data moves.
+
+#### `PairIndex` — amortized O(log n) pair lookup via a lazy heap
+
+Knowing which pair to merge next requires the most frequent pair across the entire sequence. Re-scanning from scratch each time costs $O(n)$ per step.
+
+`PairIndex` maintains a max-heap of `(-count, pair)` entries alongside a `Counter` of live frequencies. The key insight is that each merge only affects two *boundary pairs*: if $(a, b) \to c$ is applied at position $i$, only the pair to the left of $i$ and the pair to the right of $i+1$ change — everything else in the sequence is untouched. After applying a merge, `PairIndex` removes the two stale boundary pairs and adds the two updated ones, each costing $O(\log n)$.
+
+The heap is *lazy*: when a pair's count changes, a new heap entry is pushed rather than updating the existing one. Stale entries (where the heap's stored count no longer matches the live `Counter`) are detected and skipped on pop. The heap is never explicitly cleaned up; stale entries are simply ignored as they surface.
+
+Combined, these two structures reduce training from $O(nV)$ to $O(n \log n)$ and encoding from $O(nV)$ to $O(n \log V)$.
+
 ### Pre-training
 
 The model learns a latent representation of the language in a self-supervised way with a surprisingly simple approach: given a large corpus, sequences of fixed size are sampled randomly to build the batched context as input of the model, and the targets are those very same sequences shifted by one element so that the model learns to predict the next token, given a context, by minimizing the cross-entropy through gradient descent:
@@ -153,4 +186,3 @@ The model learns a latent representation of the language in a self-supervised wa
 - [RoFormer: Enhanced Transformer with Rotary Position Embedding](https://arxiv.org/abs/2104.09864)
 - [GLU Variants Improve Transformer](https://arxiv.org/abs/2002.05202)
 - [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467)
-- [SentencePiece](https://github.com/google/sentencepiece)

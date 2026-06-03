@@ -6,6 +6,8 @@ from model.tokenizer import BPETokenizer
 
 
 class NextTokenPredictionDataset(Dataset):
+    """Token-level next-token prediction dataset backed by a trained BPETokenizer."""
+
     def __init__(self, input_file: str, seq_len: int, tokenizer: BPETokenizer, eos_id: int | None = None) -> None:
         super().__init__()
         self.seq_len = seq_len
