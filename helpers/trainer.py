@@ -89,8 +89,8 @@ def train(
         metrics_tracker["train_loss"].append(loss.item())
         if step % log_every == 0 or step == num_steps - 1:
             logger.info(
-                f"step {step + 1}/{num_steps} -"
-                f"loss: {running_loss / (step + 1):.4f} -"
+                f"step {step + 1}/{num_steps} - "
+                f"loss: {running_loss / (step + 1):.4f}  -"
                 f"lr: {scheduler.get_last_lr()[-1]:.4f}"
             )
 
