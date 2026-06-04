@@ -27,10 +27,12 @@ class LLMConfig:
 
 @dataclass
 class TrainingConfig:
-    retrain_tokenizer: bool
+    """Hyperparameters and runtime settings for a training run."""
+
+    tokenizer_max_training_length: int | None  # chars of training text fed to BPETokenizer.train(); None = full corpus
     device: torch.device
+    num_steps: int
     batch_size: int
     learning_rate: float
     weight_decay: float
-    max_epochs: int
     log_frequency: int

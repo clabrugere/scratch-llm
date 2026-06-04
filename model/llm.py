@@ -58,7 +58,7 @@ class LLM(Module):
         inputs: Tensor,
         max_seq_len: int,
         stop_tokens: set | None = None,
-        temperature: float = 0.6,
+        temperature: float = 0.8,
         top_p: float = 0.8,
     ) -> Tensor:
         for _ in range(max_seq_len):
