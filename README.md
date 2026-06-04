@@ -25,9 +25,33 @@ The implementation only depends on Python and Pytorch:
 
 ## Usage <a name = "usage"></a>
 
-You can refer to the notebook in `example/shakespeare.ipynb` for an end-to-end pre-training example on a small dataset, with a model of around 10M parameters only. The loss still decreases after 2000 iterations and the training loss is quite stable so we could train it further to improve its generative abilities.
+You can refer to the notebook in `example/shakespeare.ipynb` for an end-to-end pre-training example on a small dataset, with a model of around 3M parameters only trained over 5000 steps of random batches sampled from `tinyshakespear.txt`
 
 <p align="center"><img src="resources/example-loss.png?raw=true"/></p>
+
+As we appended `<eos>` at each prose block boundaries, the model has learned to generate proses if prompted with a character's label:
+
+```python
+prompt = tokenizer.encode("KING HENRY VI:\n")
+inputs = torch.tensor(prompt, dtype=torch.int32).unsqueeze(0).to(train_config.device)
+out = model.generate(inputs, max_seq_len=256, stop_tokens={eos_id})
+print(tokenizer.decode(out.tolist(), skip_special_tokens=True))
+```
+
+Generates
+
+```
+KING HENRY VI:
+Thy father, Warwick wince, to word true: and thee you upon,
+This happy brother of France should failst,
+My histed to prove my friends and whose fillness,
+Braken worse earth and all andker name, friends
+I foreignted by the power I have,
+Whose revelful sons
+Of field, nor who sensed his teemes in ha' blood,
+Or chouldst go measure for these opposing wread,
+And allowly for shame: at me, my lord, 'tis gone.
+```
 
 ## What is Llama
 
