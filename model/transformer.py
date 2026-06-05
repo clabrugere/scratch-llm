@@ -46,12 +46,13 @@ class RotaryPositionalEncoding(Module):
 
         return torch.cat((-x2, x1), dim=-1)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, start_pos: int = 0) -> Tensor:
         # x is of shape  (bs, num_heads, seq_len, dim_emb)
         seq_len = x.size(2)
-        x = (x * self.position_cos[:, :, :seq_len, :]) + (self._rotate_half(x) * self.position_sin[:, :, :seq_len, :])
+        cos = self.position_cos[:, :, start_pos : start_pos + seq_len, :]
+        sin = self.position_sin[:, :, start_pos : start_pos + seq_len, :]
 
-        return x
+        return (x * cos) + (self._rotate_half(x) * sin)
 
 
 class RMSNorm(Module):
