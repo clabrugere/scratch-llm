@@ -5,7 +5,17 @@ from torch import Tensor
 class KVCache:
     """Stores KV pairs for all layers, to be used during autoregressive decoding.
     The cache is updated layer by layer as new tokens are generated, allowing the model to attend to all
-    previously generated tokens without recomputing KV pairs for the entire sequence at each step."""
+    previously generated tokens without recomputing KV pairs for the entire sequence at each step.
+
+    Given a new query q_t that needs to attend to all previous positions, the model computes new pairs (k_t, v_t) and
+    appends them to the cached KV pairs.
+    This allows to efficiently computes softmax(q_t[k_1, ..., k_t]^T / sqrt(d_k))[v_1, ..., v_t]
+    without recomputing KV pairs for the entire sequence at each step.
+
+    Internally, it maintains a buffer of shape (num_layers, 2, batch_size, num_head, max_seq_len, head_dim)
+    where the second dimension indexes keys (0) and values (1), and a pointer to the current sequence length.
+    The `update` method appends new KV pairs for a specific layer and returns the full KV tensors
+    for that layer up to the current sequence length."""
 
     def __init__(
         self,
@@ -25,7 +35,7 @@ class KVCache:
         self.reset()
 
     def reset(self) -> None:
-        self.cache = torch.empty(
+        self.buffer = torch.empty(
             (self.num_layers, 2, self.batch_size, self.num_head, self.max_seq_len, self.head_dim),
             dtype=torch.float32,
             device=self.device,
@@ -40,11 +50,11 @@ class KVCache:
         if end > self.max_seq_len:
             raise ValueError(f"KV cache overflow: {end} > {self.max_seq_len}")
 
-        self.cache[layer_idx, 0, :, :, self.current_seq_len : end, :] = key_new
-        self.cache[layer_idx, 1, :, :, self.current_seq_len : end, :] = value_new
+        self.buffer[layer_idx, 0, :, :, self.current_seq_len : end, :] = key_new
+        self.buffer[layer_idx, 1, :, :, self.current_seq_len : end, :] = value_new
 
-        key = self.cache[layer_idx, 0, :, :, :end, :]
-        value = self.cache[layer_idx, 1, :, :, :end, :]
+        key = self.buffer[layer_idx, 0, :, :, :end, :]
+        value = self.buffer[layer_idx, 1, :, :, :end, :]
 
         return key, value
 

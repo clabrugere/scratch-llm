@@ -191,7 +191,7 @@ class MultiHeadAttention(Module):
         # projects to the output space
         out = self.proj_out(out)  # (bs, seq_len, dim_v)
 
-        return out, attn_scores if return_scores else out
+        return (out, attn_scores) if return_scores else out
 
 
 class FeedForward(Sequential):
