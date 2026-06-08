@@ -1,6 +1,7 @@
 import logging
 import math
 from collections import defaultdict
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -98,7 +99,7 @@ def train(
 
 
 @torch.inference_mode()
-def evaluate(model: Module, dl_val: DataLoader, device: torch.device) -> float:
+def validate(model: Module, dl_val: DataLoader, device: torch.device) -> float:
     model.eval()
     running_loss = 0.0
 
@@ -110,3 +111,17 @@ def evaluate(model: Module, dl_val: DataLoader, device: torch.device) -> float:
         running_loss += loss.item()
 
     return running_loss / len(dl_val)
+
+
+def save_checkpoint(directory: str, epoch: int, model: Module, optimizer: Optimizer) -> None:
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"checkpoint_{epoch:04d}.pt"
+    torch.save(
+        {
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+        },
+        path,
+    )

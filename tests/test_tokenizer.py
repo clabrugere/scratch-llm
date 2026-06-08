@@ -363,7 +363,7 @@ def test_decode_empty():
 def test_decode_special_token():
     t = BPETokenizer(300)
     bos_id = t.register_special_token("<BOS>")
-    assert t.decode([bos_id]) == "<BOS>"
+    assert t.decode([bos_id], skip_special_tokens=False) == "<BOS>"
 
 
 def test_decode_merged_token():
@@ -375,8 +375,8 @@ def test_decode_merged_token():
 # decode(encode(text)) == text
 
 
-def assert_roundtrip(tokenizer: BPETokenizer, text: str) -> None:
-    assert tokenizer.decode(tokenizer.encode(text)) == text
+def assert_roundtrip(tokenizer: BPETokenizer, text: str, skip_special_tokens: bool = True) -> None:
+    assert tokenizer.decode(tokenizer.encode(text), skip_special_tokens=skip_special_tokens) == text
 
 
 def test_roundtrip_ascii():
@@ -399,7 +399,7 @@ def test_roundtrip_special_tokens():
     t = BPETokenizer(300)
     t.register_special_token("<BOS>")
     t.register_special_token("<EOS>")
-    assert_roundtrip(t, "<BOS>Hello, world!<EOS>")
+    assert_roundtrip(t, "<BOS>Hello, world!<EOS>", skip_special_tokens=False)
 
 
 def test_roundtrip_after_training():
@@ -420,4 +420,4 @@ def test_roundtrip_trained_with_special_tokens():
     t.register_special_token("<BOS>")
     t.register_special_token("<EOS>")
     t.train("hello world " * 10)
-    assert_roundtrip(t, "<BOS>hello world<EOS>")
+    assert_roundtrip(t, "<BOS>hello world<EOS>", skip_special_tokens=False)
