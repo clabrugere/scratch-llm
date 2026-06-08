@@ -25,6 +25,7 @@ class KVCache:
         max_seq_len: int,
         head_dim: int,
         device: torch.device,
+        dtype: torch.dtype = torch.float32,
     ) -> None:
         self.num_layers = num_layers
         self.batch_size = batch_size
@@ -32,12 +33,13 @@ class KVCache:
         self.max_seq_len = max_seq_len
         self.head_dim = head_dim
         self.device = device
+        self.dtype = dtype
         self.reset()
 
     def reset(self) -> None:
         self.buffer = torch.empty(
             (self.num_layers, 2, self.batch_size, self.num_head, self.max_seq_len, self.head_dim),
-            dtype=torch.float32,
+            dtype=self.dtype,
             device=self.device,
             requires_grad=False,
         )

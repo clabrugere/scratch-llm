@@ -175,7 +175,7 @@ class MultiHeadAttention(Module):
             k, v = layer_cache.update(k, v)  # (bs, num_heads, seq_len_cache, dim_emb)
 
         # Compute the correlation between a query q_i and all the keys, for every q_i
-        attn_scores = (q @ k.permute(0, 1, 3, 2)) * self.dim_emb**-0.5  # (bs, num_heads, seq_len, seq_len)
+        attn_scores = (q @ k.permute(0, 1, 3, 2)) * self.dim_head**-0.5  # (bs, num_heads, seq_len, seq_len)
 
         # Discard masked tokens from the attention matrix if an attention mask is provided
         if attn_mask is not None:

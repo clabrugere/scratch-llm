@@ -66,6 +66,10 @@ class LLM(Module):
         temperature: float = 0.8,
         top_p: float = 0.8,
     ) -> Tensor:
+        assert inputs.dim() == 2, "Input should be a batch of sequences with shape (batch_size, seq_len)"
+        assert inputs.size(0) == 1, "Batch size > 1 is not supported for generation"
+        assert inputs.size(1) <= self.max_seq_len, "Input sequence length exceeds maximum sequence length"
+
         self.eval()
         # build KV cache for autoregressive decoding
         cache = KVCache(
@@ -75,6 +79,7 @@ class LLM(Module):
             max_seq_len=self.max_seq_len,
             head_dim=self.head_dim,
             device=inputs.device,
+            dtype=next(self.parameters()).dtype,
         )
 
         max_new_tokens = min(max_seq_len, self.max_seq_len - inputs.size(1))
