@@ -201,14 +201,14 @@ The model learns a latent representation of the language in a self-supervised wa
 
 Naive inference with auto-regressive transformer models consists in generating one token at a time, append it the the context, and generate a token again (hence auto-regressive).
 
-To generate token $ t $, the model needs keys $ [k_1, ..., k_{t-1}] $ and values $ [v_1, ..., v_{t-1}] $ for all the previous positions to calculate attention scores with respect to the query $ q_t $ corresponding to the token. Instead of recomputing those at each generating step, they can be cached into what is usually called a KV cache, drastically accelerating inference (but at the cost of a larger memory footprint). 
+To generate token $t$, the model needs keys $[k_1, ..., k_{t-1}]$ and values $[v_1, ..., v_{t-1}]$ for all the previous positions to calculate attention scores with respect to the query $q_t$ corresponding to the token. Instead of recomputing those at each generating step, they can be cached into what is usually called a KV cache, drastically accelerating inference (but at the cost of a larger memory footprint). 
 
 The cache simply stores a buffer of key and values for past positions and a pointer to the current sequence length. Generating with it becomes:
 
-0. Prefill the cache with $ K = X W_K $ and $ V = X W_V $ where $ X $ is the encoded prompt.
-1. Now for each new token $ t $, compute $ q_t = x_t W_Q $, $ k_t = x_t W_K $ and $ v_t = x_t W_V $
-2. Append to the KV cache buffers $ K \leftarrow [K, k_t] $ and $ V \leftarrow [V, v_t] $
-3. Use cached $ K $ and $ V $ from previous tokens.
+0. Prefill the cache with $K = X W_K$ and $V = X W_V$ where $X$ is the encoded prompt.
+1. Now for each new token $t$, compute $q_t = x_t W_Q$, $k_t = x_t W_K$ and $v_t = x_t W_V$
+2. Append to the KV cache buffers $K \leftarrow [K, k_t]$ and $V \leftarrow [V, v_t]$
+3. Use cached $K$ and $V$ from previous tokens.
 
 ## References
 
