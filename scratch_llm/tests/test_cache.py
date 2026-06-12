@@ -3,7 +3,7 @@ from typing import Callable
 import pytest
 import torch
 
-from model.cache import KVCache
+from scratch_llm.model.cache import KVCache
 
 
 @pytest.fixture

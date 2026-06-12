@@ -7,11 +7,12 @@ import torch
 import torch.nn.functional as F
 from torch.amp import autocast
 from torch.nn import Module
-from torch.optim import AdamW, Optimizer
+from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader, RandomSampler
 
-from helpers.dataset import NextTokenPredictionDataset
+from scratch_llm.helpers.dataset import NextTokenPredictionDataset
+from scratch_llm.model.tokenizer import BPETokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,11 @@ def lr_scheduler(
 
 def train(
     model: Module,
+    optimizer: Optimizer,
     ds_train: NextTokenPredictionDataset,
     num_steps: int,
     batch_size: int,
-    lr: float,
     device: torch.device,
-    weight_decay: float = 0.0,
     log_every: int = 10,
     grad_clip: float | None = 1.0,
     pin_memory: bool = True,
@@ -60,7 +60,6 @@ def train(
         pin_memory=pin_memory,
         num_workers=num_workers,
     )
-    optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = lr_scheduler(
         optimizer,
         min_lr_ratio=0.1,
@@ -113,15 +112,16 @@ def validate(model: Module, dl_val: DataLoader, device: torch.device) -> float:
     return running_loss / len(dl_val)
 
 
-def save_checkpoint(directory: str, epoch: int, model: Module, optimizer: Optimizer) -> None:
+def save_checkpoint(model: Module, optimizer: Optimizer, tokenizer: BPETokenizer, directory: str, step: int) -> None:
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"checkpoint_{epoch:04d}.pt"
+    path = directory / f"checkpoint_{step:d}.pt"
     torch.save(
         {
-            "epoch": epoch,
+            "step": step,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
+            "tokenizer_state_dict": tokenizer.state_dict(),
         },
         path,
     )

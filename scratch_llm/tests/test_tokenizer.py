@@ -1,6 +1,6 @@
 import pytest
 
-from model.tokenizer import BPETokenizer, PairIndex, TokenSequence, string_to_byte
+from scratch_llm.model.tokenizer import BPETokenizer, PairIndex, TokenSequence, string_to_byte
 
 # string_to_byte
 
@@ -157,9 +157,9 @@ def test_pair_index_pop_returns_positions_and_removes():
 # BPETokenizer initialization
 
 
-def test_tokenizer_max_vocab_256_raises():
+def test_tokenizer_max_vocab_255_raises():
     with pytest.raises(ValueError):
-        BPETokenizer(256)
+        BPETokenizer(255)
 
 
 def test_tokenizer_max_vocab_zero_raises():

@@ -2,7 +2,7 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from model.tokenizer import BPETokenizer
+from scratch_llm.model.tokenizer import BPETokenizer
 
 
 class NextTokenPredictionDataset(Dataset):

@@ -90,7 +90,7 @@ class BPETokenizer:
         size is 256. It also guarantee that we can't have out of vocabulary tokens as long as the input string can be
         encoded in UTF-8."""
 
-        if max_vocab_size <= 256:
+        if max_vocab_size < 256:
             raise ValueError(f"max_vocab_size must be at least 256, got '{max_vocab_size}'.")
 
         self.max_vocab_size = max_vocab_size
@@ -247,3 +247,24 @@ class BPETokenizer:
     @property
     def vocab_size(self) -> int:
         return self.next_id
+
+    def state_dict(self) -> dict:
+        """Return a serializable state dict for saving the tokenizer."""
+        return {
+            "max_vocab_size": self.max_vocab_size,
+            "pairs": self.pairs,
+            "id_to_token": self.id_to_token,
+            "next_id": self.next_id,
+            "special_to_id": self.special_to_id,
+            "id_to_special": self.id_to_special,
+        }
+
+    def load_state_dict(self, state: dict) -> None:
+        """Load tokenizer state from a state dict."""
+        self.max_vocab_size = state["max_vocab_size"]
+        self.pairs = state["pairs"]
+        self.id_to_token = state["id_to_token"]
+        self.next_id = state["next_id"]
+        self.special_to_id = state["special_to_id"]
+        self.id_to_special = state["id_to_special"]
+        self._special_pattern = None  # Invalidate cached regex pattern
