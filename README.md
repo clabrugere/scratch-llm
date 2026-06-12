@@ -25,6 +25,28 @@ The implementation only depends on Python and Pytorch:
 
 ## Usage <a name = "usage"></a>
 
+### CLI
+
+```bash
+python -m scratch_llm.main --input_file data/tinyshakespeare.txt
+```
+
+Key flags (all have defaults except `--input_file`):
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--input_file` | *(required)* | Path to the training text file |
+| `--vocab_size` | 4000 | BPE vocabulary size |
+| `--seq_len` | 256 | Context window length |
+| `--num_steps` | 5000 | Number of training steps |
+| `--batch_size` | 128 | Batch size |
+| `--learning_rate` | 3e-3 | Peak learning rate |
+| `--chkpt_dir` | `checkpoints` | Directory for the saved checkpoint |
+
+The tokenizer is trained on the same corpus, and a final checkpoint (model + optimizer + tokenizer state) is written to `<chkpt_dir>/checkpoint_<num_steps>.pt`.
+
+### Notebook
+
 You can refer to the notebook in `example/shakespeare.ipynb` for an end-to-end pre-training example on a small dataset, with a model of around 3M parameters only trained over 5000 steps of random batches sampled from `tinyshakespear.txt`
 
 <p align="center"><img src="resources/example-loss.png?raw=true"/></p>
