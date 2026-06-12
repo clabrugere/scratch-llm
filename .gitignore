@@ -2,6 +2,7 @@
 data/
 example/debug.ipynb
 example/wiki-french.ipynb
+checkpoints/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

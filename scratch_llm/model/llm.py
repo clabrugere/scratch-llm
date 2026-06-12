@@ -3,8 +3,8 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Dropout, Embedding, Linear, Module
 
-from model.cache import KVCache
-from model.transformer import RMSNorm, TransformerStack
+from scratch_llm.model.cache import KVCache
+from scratch_llm.model.transformer import RMSNorm, TransformerStack
 
 
 def sample_top_p(probs: Tensor, threshold: float) -> Tensor:

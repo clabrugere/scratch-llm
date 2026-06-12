@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Module, ModuleList, Parameter, Sequential
 
-from model.cache import KVCache, LayerKVCache
+from scratch_llm.model.cache import KVCache, LayerKVCache
 
 
 class CosinePositionalEncoding(Module):

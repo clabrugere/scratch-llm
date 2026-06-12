@@ -1,6 +1,6 @@
 import pytest
 
-from model.tokenizer import BPETokenizer, PairIndex, TokenSequence, string_to_byte
+from scratch_llm.model.tokenizer import BPETokenizer, PairIndex, TokenSequence, string_to_byte
 
 # string_to_byte
 
