@@ -98,8 +98,7 @@ def main():
     )
 
     # save final checkpoint
-    final_chkpt_path = f"{args.chkpt_dir}/final_checkpoint.pt"
-    logger.info(f"Saving final checkpoint to {final_chkpt_path}")
+    logger.info(f"Saving final checkpoint to {args.chkpt_dir}...")
     save_checkpoint(model, optimizer, tokenizer, args.chkpt_dir, train_config.num_steps)
 
     logger.info("Training complete.")
